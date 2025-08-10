@@ -1,536 +1,396 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
+<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Jump Rope + Push-up Interval Timer</title>
-
-<!-- PWA: iOS and general -->
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0f1115">
-
+<title>Jump Rope HIIT Timer</title>
+<meta name="theme-color" content="#0b0b0c" />
 <style>
   :root{
-    --bg:#0f1115; --card:#161a22; --ink:#e8ecf1; --muted:#98a2b3;
-    --brand:#7c9cff; --accent:#23d18b; --danger:#ff6b6b; --ring:#2b3040;
-    --btn:#232a36; --btn-hover:#2b3445;
+    --bg:#0b0b0c; --panel:#121316; --accent:#4ade80; --accent2:#60a5fa; --warn:#f59e0b; --text:#f8fafc; --muted:#cbd5e1;
   }
   *{box-sizing:border-box}
-  body{
-    margin:0; font-family: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,Arial;
-    background:linear-gradient(180deg,#0c0e13, #0f1115 40%);
-    color:var(--ink);
-    min-height:100svh; display:grid; place-items:start center;
-    padding:16px;
-  }
-  .app{width:min(900px,100%); display:grid; gap:16px}
-  header{display:flex; align-items:center; justify-content:space-between}
-  h1{font-size:20px; margin:0; letter-spacing:.3px}
-  .badge{font-size:12px; color:var(--muted); background:#1d2330; padding:4px 8px; border-radius:8px}
-  .grid{display:grid; grid-template-columns: 1.2fr .8fr; gap:16px}
-  @media (max-width:800px){ .grid{grid-template-columns:1fr} }
+  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text);}
+  header{padding:16px; text-align:center; font-weight:800; letter-spacing:.5px;}
+  .app{max-width:900px; margin:0 auto; padding:16px;}
+  .card{background:var(--panel); border:1px solid #1f2937; border-radius:20px; padding:20px; box-shadow:0 8px 30px rgba(0,0,0,.35)}
+  .grid{display:grid; grid-template-columns:1fr; gap:16px}
+  @media(min-width:720px){.grid{grid-template-columns:1.2fr .8fr}}
 
-  .card{background:var(--card); border:1px solid #1e2432; border-radius:14px; padding:14px}
-  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
-  .row > *{flex:1}
-  .controls .row > *{flex:initial}
-  label{font-size:12px; color:var(--muted); display:block; margin-bottom:6px}
-  input[type="number"], input[type="text"], select{
-    width:100%; padding:10px 12px; border-radius:10px; border:1px solid #283042;
-    background:#111622; color:var(--ink); outline:none;
-  }
-  input[type="number"]::-webkit-outer-spin-button,
-  input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance: none; margin:0 }
-  button{
-    background:var(--btn); border:1px solid #2c3446; color:var(--ink);
-    padding:10px 14px; border-radius:12px; cursor:pointer; transition:.15s ease;
-  }
-  button:hover{background:var(--btn-hover)}
-  .primary{background:var(--brand); border-color:#6a88ff; color:#0c0f17}
-  .success{background:var(--accent); border-color:#1fbb7c; color:#08130f}
-  .danger{background:var(--danger); border-color:#ff8484; color:#2b0b0b}
-  .ghost{background:transparent; border-color:#2c3446}
-  .chip{padding:6px 10px; background:#1b2230; border:1px solid #2b3446; border-radius:999px; font-size:12px}
-  .tiny{font-size:12px}
+  .big{font-size:clamp(42px, 6vw, 86px); font-weight:900; text-align:center; line-height:1;}
+  .label{font-size:clamp(14px, 2vw, 18px); color:var(--muted); text-align:center; letter-spacing:.2px}
+  .exercise{font-size:clamp(22px, 3.2vw, 40px); text-align:center; font-weight:800; margin-top:6px}
+  .phase{display:inline-block; padding:6px 12px; border-radius:999px; font-weight:700; letter-spacing:.25px;}
+  .phase.work{background:rgba(74,222,128,.15); color:var(--accent); border:1px solid rgba(74,222,128,.4)}
+  .phase.rest{background:rgba(96,165,250,.15); color:var(--accent2); border:1px solid rgba(96,165,250,.4)}
+  .phase.setrest{background:rgba(245,158,11,.15); color:var(--warn); border:1px solid rgba(245,158,11,.4)}
 
-  .phase{display:grid; grid-template-columns: 1.2fr repeat(3, .6fr) .4fr; gap:10px; align-items:end}
-  @media (max-width:640px){ .phase{grid-template-columns: 1fr 1fr 1fr 1fr auto} }
+  .controls{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:10px}
+  button{appearance:none; border:none; cursor:pointer; background:#1e293b; color:var(--text); padding:14px 18px; border-radius:14px; font-weight:800; letter-spacing:.3px; font-size:16px}
+  button.primary{background:var(--accent); color:#0b1510}
+  button.warn{background:#334155}
+  button:disabled{opacity:.5; cursor:not-allowed}
+  .pill{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:#111827; border:1px solid #1f2937;}
 
-  .phase + .phase{margin-top:10px}
-  .phase h3{margin:0 0 6px 0; font-size:14px}
+  .row{display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap}
+  .progress{height:14px; background:#0f172a; border:1px solid #263244; border-radius:999px; overflow:hidden}
+  .progress>div{height:100%; width:0%}
+  .progress.work>div{background:linear-gradient(90deg, rgba(74,222,128,.85), rgba(34,197,94,.9))}
+  .progress.rest>div{background:linear-gradient(90deg, rgba(96,165,250,.85), rgba(59,130,246,.9))}
+  .progress.setrest>div{background:linear-gradient(90deg, rgba(245,158,11,.85), rgba(234,88,12,.9))}
 
-  .timer{
-    display:grid; grid-template-columns: 300px 1fr; gap:16px; align-items:center;
-  }
-  @media (max-width:800px){ .timer{grid-template-columns:1fr} }
+  .list{max-height:420px; overflow:auto; border:1px solid #1f2937; border-radius:14px}
+  .item{display:flex; gap:10px; align-items:center; padding:10px 12px; border-bottom:1px dashed #1f2937}
+  .item:last-child{border-bottom:none}
+  .badge{min-width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-size:12px; font-weight:800; background:#0f172a; border:1px solid #1f2937;}
+  .item.active{background:rgba(59,130,246,.08)}
 
-  .dial{
-    width:min(70vw,300px); aspect-ratio:1; position:relative; place-self:center;
-  }
-  canvas{width:100%; height:100%}
-  .dial .readout{
-    position:absolute; inset:0; display:grid; place-items:center; text-align:center;
-  }
-  .big{font-size:44px; font-weight:700; line-height:1}
-  .sub{font-size:13px; color:var(--muted); margin-top:6px}
+  details.settings{background:#0d1117; border:1px solid #1f2937; border-radius:16px; padding:14px}
+  details.settings summary{cursor:pointer; font-weight:800}
+  .settings-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:12px}
+  .settings-grid label{display:grid; gap:6px; font-size:14px; color:var(--muted)}
+  input[type="number"], select{width:100%; padding:12px; border-radius:12px; border:1px solid #1f2937; background:#0b1220; color:var(--text)}
 
-  .stack{display:grid; gap:10px}
-  .list{display:grid; gap:8px; max-height:220px; overflow:auto; padding-right:4px}
-  .item{display:flex; justify-content:space-between; align-items:center; background:#121827; border:1px solid #252f44; padding:8px 10px; border-radius:10px}
-  .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#202638; border:1px solid #2a3450; padding:2px 6px; border-radius:6px; font-size:12px}
+  footer{opacity:.7; text-align:center; padding:16px; font-size:13px}
 
-  .footer{display:flex; justify-content:space-between; align-items:center; color:var(--muted)}
-  a{color:#b4c6ff; text-decoration:none}
+  /* Full workout progress bar */
+  .full-progress {height:14px; background:#0f172a; border:1px solid #263244; border-radius:999px; overflow:hidden; margin-top:8px}
+  .full-progress>div{height:100%; width:0%; background:linear-gradient(90deg, rgba(250,204,21,.85), rgba(245,158,11,.9))}
 </style>
 </head>
 <body>
-<div class="app">
-  <header>
-    <h1>Interval Timer — Jump Rope + Push-ups</h1>
-    <span class="badge">PWA</span>
-  </header>
-
-  <div class="grid">
-    <section class="card stack">
-      <div class="timer">
-        <div class="dial">
-          <canvas id="ring" width="600" height="600" aria-hidden="true"></canvas>
-          <div class="readout">
-            <div class="sub" id="segmentLabel">Ready</div>
-            <div class="big" id="timeLeft">00:00</div>
-            <div class="sub" id="phaseInfo">Phase — Round — Segment</div>
-          </div>
-        </div>
-
-        <div class="stack">
-          <div class="row controls">
-            <button class="primary" id="startPause">Start</button>
-            <button class="ghost" id="next">Next ⏭</button>
-            <button class="ghost" id="prev">⏮ Prev</button>
-            <button class="danger" id="reset">Reset</button>
-          </div>
-          <div class="row">
-            <label class="chip"><input type="checkbox" id="sound" checked> Beep</label>
-            <label class="chip"><input type="checkbox" id="vibrate" checked> Vibrate</label>
-            <label class="chip"><input type="checkbox" id="countdown3" checked> 3-2-1 cue</label>
-            <label class="chip"><input type="checkbox" id="noEndRest"> Skip final rest</label>
-            <label class="chip"><input type="checkbox" id="dark" checked> Dark mode</label>
-          </div>
-
-          <div class="card" style="background:#121826;border-color:#223049">
-            <div class="row tiny" style="justify-content:space-between">
-              <div>Keyboard: <span class="kbd">Space</span> Start/Pause • <span class="kbd">N</span> Next • <span class="kbd">P</span> Prev • <span class="kbd">R</span> Reset</div>
-              <div id="status" class="tiny">Ready</div>
-            </div>
-          </div>
-
-          <div class="card" style="background:#121826;border-color:#223049">
-            <div class="row">
-              <button id="savePreset">Save as Default</button>
-              <button id="exportJSON">Export Routine</button>
-              <input id="importFile" type="file" accept="application/json" />
-            </div>
-          </div>
-        </div>
+  <header>JUMP ROPE HIIT • <span style="opacity:.7">Bold Timer</span></header>
+  <div class="app grid">
+    <section class="card">
+      <div class="row" style="justify-content:space-between">
+        <div class="pill">Set <strong id="setNow">1</strong> / <span id="setTotal">5</span></div>
+        <div class="pill">Step <strong id="stepNow">1</strong> / <span id="stepTotal">45</span></div>
+        <div class="pill">Next: <span id="nextLabel">—</span></div>
       </div>
+
+      <div style="text-align:center; margin:16px 0 6px">
+        <span id="phaseTag" class="phase work">WORK</span>
+      </div>
+
+      <div class="exercise" id="exerciseName">Basic Bounce (Jump Rope)</div>
+      <div class="big" id="time">00:45</div>
+
+      <div class="progress work" aria-label="time progress" style="margin:10px 0 4px">
+        <div id="bar"></div>
+      </div>
+      <div class="label" id="phaseHint">Go fast but relaxed. Land light.</div>
+
+      <!-- Overall workout progress -->
+      <div class="label" style="margin-top:8px">Workout progress</div>
+      <div class="full-progress" aria-label="overall progress">
+        <div id="totalBar"></div>
+      </div>
+      <div class="row" style="gap:8px; margin-bottom:6px">
+        <div class="pill">Elapsed: <strong id="totalElapsed">00:00</strong></div>
+        <div class="pill">Remaining: <strong id="totalRemaining">00:00</strong></div>
+        <div class="pill">Total: <strong id="totalTotal">00:00</strong></div>
+      </div>
+
+      <div class="controls">
+        <button id="back">◀︎ Back</button>
+        <button id="start" class="primary">▶ Start</button>
+        <button id="pause" style="display:none" class="warn">⏸ Pause</button>
+        <button id="reset">⟲ Reset</button>
+        <button id="skip">Next ▶︎</button>
+        <button id="fs">⤢ Fullscreen</button>
+      </div>
+
+      <details class="settings" style="margin-top:14px">
+        <summary>Settings (durations & rounds)</summary>
+        <div class="settings-grid">
+          <label>Work (sec)
+            <input id="workSec" type="number" min="10" max="180" step="5" value="45" />
+          </label>
+          <label>Rest between moves (sec)
+            <input id="restSec" type="number" min="5" max="120" step="5" value="15" />
+          </label>
+          <label>Set rest (sec)
+            <input id="setRestSec" type="number" min="10" max="300" step="5" value="60" />
+          </label>
+          <label>Rounds (sets)
+            <input id="rounds" type="number" min="1" max="10" step="1" value="5" />
+          </label>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button id="apply" class="primary">Apply</button>
+        </div>
+      </details>
     </section>
 
-    <section class="card stack">
-      <div class="row">
-        <select id="presets">
-          <option value="">Presets for Your Plan…</option>
-          <option value="w1">Week 1 — 30s / 30s × 8 + Push-ups 3×</option>
-          <option value="w2">Week 2 — 40s / 20s × 10 + Push-ups 4×</option>
-          <option value="w3">Week 3 — 45s / 15s × 12 + Push-ups 5×</option>
-          <option value="w4">Week 4 — 60s / 15s × 12–15 + Push-ups 6×</option>
-        </select>
-        <button id="applyPreset">Apply</button>
+    <aside class="card">
+      <div class="row" style="justify-content:space-between; margin-bottom:8px">
+        <div style="font-weight:800">Circuit Preview</div>
+        <div class="pill">Total Steps: <span id="previewCount">—</span></div>
       </div>
-
-      <div class="stack">
-        <h2 style="font-size:16px;margin:0">Routine Phases</h2>
-        <div id="phases" class="list"></div>
-        <button id="addPhase">+ Add Phase</button>
-      </div>
-
-      <div class="card" style="background:#121826;border-color:#223049">
-        <h3 style="margin:0 0 8px 0;font-size:14px;">How to use</h3>
-        <ul class="tiny" style="margin:0 0 0 18px; color:var(--muted); line-height:1.6">
-          <li>Install to Home Screen for full-screen use and offline support.</li>
-          <li>Pick a preset (Week 1–4) or build your own phases.</li>
-          <li>Press <strong>Start</strong>. Use <strong>Next</strong> to skip ahead (e.g., jump rope → push-ups).</li>
-        </ul>
-      </div>
-    </section>
+      <div id="list" class="list"></div>
+    </aside>
   </div>
 
-  <div class="footer">
-    <div>Made for fast jump rope intervals + push-up sets.</div>
-    <div><a href="#" id="share">Share current routine</a></div>
-  </div>
-</div>
+  <footer>
+    Built for Kalana • Single-file app – just drop <code>index.html</code> in your repo and publish via GitHub Pages.
+  </footer>
 
-<script>
-/* Register service worker for offline + A2HS */
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
-  });
-}
+  <audio id="beep"></audio>
 
-/* ---------- Utilities ---------- */
-const $ = sel => document.querySelector(sel);
-const ring = $('#ring');
-const ctx = ring.getContext('2d');
-const TAU = Math.PI * 2;
+  <script>
+    // ===== Config =====
+    const DEFAULTS = { work:45, rest:15, setRest:60, rounds:5 };
+    const EXERCISES = [
+      'Basic Bounce (Jump Rope)',
+      'Butt Kicks (Jump Rope)',
+      'Push-ups',
+      'Basic Bounce (Jump Rope)',
+      'High Knees (Jump Rope)',
+      'Basic Bounce (Jump Rope)',
+      'Jump Squats',
+      'Basic Bounce (Jump Rope)',
+      'Normal Squats',
+    ];
 
-const fmt = (s)=> {
-  s = Math.max(0, Math.round(s));
-  const m = Math.floor(s/60).toString().padStart(2,'0');
-  const x = (s%60).toString().padStart(2,'0');
-  return `${m}:${x}`;
-};
+    const HINTS = {
+      work:{
+        'Basic Bounce (Jump Rope)':'Relax shoulders, elbows in, soft feet.',
+        'Butt Kicks (Jump Rope)':'Kick heels to glutes, quick wrists.',
+        'Push-ups':'Tight core, chest to floor, full lockout.',
+        'High Knees (Jump Rope)':'Drive knees up, stay tall, fast rope.',
+        'Jump Squats':'Hips back, soft landing, stay springy.',
+        'Normal Squats':'Knees track toes, chest proud.'
+      },
+      rest:{'*':'Breathe through the nose, shake it out.'},
+      setrest:{'*':'Walk around, sip water. Nice work!'}
+    };
 
-function beep(type="short"){
-  if(!$('#sound').checked) return;
-  const ctxA = new (window.AudioContext || window.webkitAudioContext)();
-  const o = ctxA.createOscillator();
-  const g = ctxA.createGain();
-  o.connect(g); g.connect(ctxA.destination);
-  if(type==="short"){ o.frequency.value=880; }
-  else if(type==="long"){ o.frequency.value=560; }
-  else if(type==="tick"){ o.frequency.value=1200; }
-  o.type="sine"; g.gain.value=0.001;
-  o.start();
-  const now = ctxA.currentTime;
-  g.gain.exponentialRampToValueAtTime(0.15, now+0.01);
-  g.gain.exponentialRampToValueAtTime(0.00001, now + (type==="long"?0.25:0.08));
-  o.stop(now + (type==="long"?0.28:0.1));
-}
+    // Simple beep generator (WebAudio) for 3-2-1 and transitions
+    function playBeep(freq=880, dur=140){
+      try{
+        const ctx = new (window.AudioContext||window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type='sine'; o.frequency.value=freq; o.connect(g); g.connect(ctx.destination);
+        o.start(); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur/1000);
+        setTimeout(()=>{o.stop(); ctx.close();}, dur+50);
+      }catch(e){/* ignore */}
+    }
 
-function vibrate(ms=60){
-  if(!$('#vibrate').checked) return;
-  if(navigator.vibrate) navigator.vibrate(ms);
-}
+    // ===== State =====
+    let plan = [];
+    let idx = 0; // current step index in plan
+    let timeLeft = 0; // seconds remaining in current step
+    let running = false;
+    let timer = null;
+    let totalDur = 0; // total workout seconds
 
-/* ---------- Routine Model ---------- */
-function defaultPhases(){
-  return [
-    { name:"Jump Rope", work:30, rest:30, rounds:8, color:"#7c9cff" },
-    { name:"Push-ups", work:45, rest:30, rounds:3, color:"#23d18b" }
-  ];
-}
+    const els = {
+      setNow: document.getElementById('setNow'),
+      setTotal: document.getElementById('setTotal'),
+      stepNow: document.getElementById('stepNow'),
+      stepTotal: document.getElementById('stepTotal'),
+      nextLabel: document.getElementById('nextLabel'),
+      phaseTag: document.getElementById('phaseTag'),
+      exerciseName: document.getElementById('exerciseName'),
+      time: document.getElementById('time'),
+      bar: document.getElementById('bar'),
+      phaseHint: document.getElementById('phaseHint'),
+      list: document.getElementById('list'),
+      previewCount: document.getElementById('previewCount'),
+      start: document.getElementById('start'),
+      pause: document.getElementById('pause'),
+      reset: document.getElementById('reset'),
+      back: document.getElementById('back'),
+      skip: document.getElementById('skip'),
+      fs: document.getElementById('fs'),
+      workSec: document.getElementById('workSec'),
+      restSec: document.getElementById('restSec'),
+      setRestSec: document.getElementById('setRestSec'),
+      rounds: document.getElementById('rounds'),
+      apply: document.getElementById('apply'),
+      // New overall progress refs
+      totalBar: document.getElementById('totalBar'),
+      totalElapsed: document.getElementById('totalElapsed'),
+      totalRemaining: document.getElementById('totalRemaining'),
+      totalTotal: document.getElementById('totalTotal')
+    };
 
-let phases = JSON.parse(localStorage.getItem("jr_phases") || "null") || defaultPhases();
+    function loadSettings(){
+      const raw = localStorage.getItem('jr-settings');
+      if(!raw) return {...DEFAULTS};
+      try{ return {...DEFAULTS, ...JSON.parse(raw)} }catch{ return {...DEFAULTS} }
+    }
+    function saveSettings(cfg){ localStorage.setItem('jr-settings', JSON.stringify(cfg)); }
 
-/* ---------- Builder UI ---------- */
-const phasesEl = $('#phases');
+    function buildPlan(cfg){
+      const steps = [];
+      totalDur = 0;
+      for(let r=1;r<=cfg.rounds;r++){
+        EXERCISES.forEach((name, i)=>{
+          steps.push({type:'work', label:name, dur:cfg.work, set:r});
+          totalDur += cfg.work;
+          const isLastInSet = i===EXERCISES.length-1;
+          if(!isLastInSet){
+            steps.push({type:'rest', label:'Rest', dur:cfg.rest, set:r});
+            totalDur += cfg.rest;
+          }else if(r<cfg.rounds){
+            steps.push({type:'setrest', label:'Set Rest', dur:cfg.setRest, set:r});
+            totalDur += cfg.setRest;
+          }
+        });
+      }
+      return steps;
+    }
 
-function phaseRow(p, idx){
-  const row = document.createElement('div');
-  row.className = 'phase';
-  row.innerHTML = `
-    <div>
-      <label>Name</label>
-      <input type="text" value="\${p.name}" data-k="name" />
-    </div>
-    <div>
-      <label>Work (sec)</label>
-      <input type="number" min="1" value="\${p.work}" data-k="work" />
-    </div>
-    <div>
-      <label>Rest (sec)</label>
-      <input type="number" min="0" value="\${p.rest}" data-k="rest" />
-    </div>
-    <div>
-      <label>Rounds</label>
-      <input type="number" min="1" value="\${p.rounds}" data-k="rounds" />
-    </div>
-    <div class="row" style="gap:6px">
-      <button title="Move up">↑</button>
-      <button title="Move down">↓</button>
-      <button class="danger" title="Delete">✕</button>
-    </div>
-  `;
-  row.querySelectorAll('input').forEach(inp=>{
-    inp.addEventListener('change', ()=>{
-      const k = inp.dataset.k;
-      let v = inp.type==="number" ? parseInt(inp.value||0,10) : inp.value;
-      if(k==="work"||k==="rest") v = Math.max(0, v|0);
-      if(k==="rounds") v = Math.max(1, v|0);
-      phases[idx][k] = v;
-      persist();
-      refresh();
+    function fmt(sec){
+      const s = Math.max(0, Math.ceil(sec));
+      const m = Math.floor(s/60).toString().padStart(2,'0');
+      const ss = (s%60).toString().padStart(2,'0');
+      return `${m}:${ss}`;
+    }
+
+    function hintFor(step){
+      if(step.type==='work'){
+        return (HINTS.work[step.label]||'Own your pace. Form first.');
+      }
+      if(step.type==='rest') return HINTS.rest['*'];
+      return HINTS.setrest['*'];
+    }
+
+    function renderList(){
+      els.list.innerHTML='';
+      plan.forEach((s,i)=>{
+        const div=document.createElement('div');
+        div.className='item'+(i===idx?' active':'');
+        const badge=document.createElement('div'); badge.className='badge'; badge.textContent=(i+1);
+        const tag=document.createElement('span'); tag.className='phase '+s.type; tag.textContent=s.type==='work'?'WORK':(s.type==='rest'?'REST':'SET REST');
+        const name=document.createElement('div'); name.style.fontWeight='700'; name.textContent=s.type==='work'?s.label:s.label;
+        const dur=document.createElement('div'); dur.style.marginLeft='auto'; dur.style.opacity='.7'; dur.textContent=`${s.dur}s`;
+        div.append(badge, tag, name, dur); els.list.append(div);
+      })
+      els.previewCount.textContent=plan.length;
+    }
+
+    function applyPhaseStyles(type){
+      els.phaseTag.className='phase '+type;
+      const prog = document.querySelector('.progress');
+      prog.className='progress '+type;
+    }
+
+    function updateUI(){
+      const s = plan[idx];
+      if(!s) return;
+      els.exerciseName.textContent = s.type==='work'? s.label : s.label;
+      els.phaseTag.textContent = s.type==='work'? 'WORK' : s.type==='rest'? 'REST' : 'SET REST';
+      els.time.textContent = fmt(timeLeft);
+      els.phaseHint.textContent = hintFor(s);
+      applyPhaseStyles(s.type);
+
+      // progress bar (current step)
+      const done = Math.max(0, 1 - (timeLeft / s.dur));
+      els.bar.style.width = (done*100).toFixed(1)+'%';
+
+      // meta
+      els.stepNow.textContent = idx+1;
+      els.stepTotal.textContent = plan.length;
+      els.setNow.textContent = s.set;
+      els.setTotal.textContent = settings.rounds;
+
+      // next label
+      const next = plan[idx+1];
+      els.nextLabel.textContent = next ? (next.type==='work'? next.label : (next.type==='rest'?'Rest':'Set Rest')) : 'Done';
+
+      // highlight active item
+      const items = els.list.querySelectorAll('.item');
+      items.forEach((e,i)=> e.classList.toggle('active', i===idx));
+
+      // overall progress
+      const elapsedBefore = plan.slice(0, idx).reduce((a,b)=>a+b.dur, 0);
+      const elapsed = Math.min(totalDur, Math.max(0, elapsedBefore + (plan[idx]?.dur - timeLeft)));
+      const remaining = Math.max(0, totalDur - elapsed);
+      const pct = totalDur ? ((elapsed/totalDur)*100).toFixed(1) : 0;
+      document.getElementById('totalBar').style.width = pct+'%';
+      els.totalElapsed.textContent = fmt(elapsed);
+      els.totalRemaining.textContent = fmt(remaining);
+      els.totalTotal.textContent = fmt(totalDur);
+    }
+
+    function stepNext(){
+      if(idx < plan.length-1){ idx++; timeLeft = plan[idx].dur; updateUI(); }
+      else { running=false; clearInterval(timer); playBeep(660,200); playBeep(440,220); alert('Workout complete! Nice job.'); toggleButtons(); }
+    }
+
+    function tick(){
+      if(!running) return;
+      timeLeft -= 0.2; // 200ms resolution (smooth bar)
+      if([3,2,1].includes(Math.ceil(timeLeft))){ playBeep(900-100*Math.ceil(timeLeft),100); }
+      if(timeLeft <= 0){ playBeep(520,200); stepNext(); }
+      updateUI();
+    }
+
+    function toggleButtons(){
+      els.start.style.display = running? 'none':'inline-block';
+      els.pause.style.display = running? 'inline-block':'none';
+    }
+
+    function start(){ if(running) return; running=true; toggleButtons(); timer = setInterval(tick, 200); }
+    function pause(){ running=false; toggleButtons(); clearInterval(timer); }
+    function reset(){ pause(); idx=0; timeLeft=plan[0].dur; updateUI(); }
+    function skip(){ timeLeft=0.01; }
+    function back(){ if(idx>0){ idx--; timeLeft=plan[idx].dur; updateUI(); } }
+
+    function enterFS(){
+      const el = document.documentElement; if(el.requestFullscreen) el.requestFullscreen();
+    }
+
+    function applyFromInputs(){
+      const cfg = {
+        work: +els.workSec.value || DEFAULTS.work,
+        rest: +els.restSec.value || DEFAULTS.rest,
+        setRest: +els.setRestSec.value || DEFAULTS.setRest,
+        rounds: Math.max(1, Math.min(10, +els.rounds.value || DEFAULTS.rounds))
+      };
+      saveSettings(cfg);
+      init(cfg);
+    }
+
+    function fillInputs(cfg){
+      els.workSec.value = cfg.work;
+      els.restSec.value = cfg.rest;
+      els.setRestSec.value = cfg.setRest;
+      els.rounds.value = cfg.rounds;
+    }
+
+    function init(cfg){
+      settings = cfg;
+      plan = buildPlan(settings);
+      totalDur = plan.reduce((a,b)=>a+b.dur, 0);
+      idx = 0; timeLeft = plan[0].dur; running=false; clearInterval(timer);
+      renderList(); updateUI(); toggleButtons();
+    }
+
+    // ===== bootstrap =====
+    let settings = loadSettings();
+    fillInputs(settings);
+    init(settings);
+
+    // events
+    els.start.onclick = start;
+    els.pause.onclick = pause;
+    els.reset.onclick = reset;
+    els.skip.onclick = skip;
+    els.back.onclick = back;
+    els.fs.onclick = enterFS;
+    els.apply.onclick = applyFromInputs;
+
+    // Keyboard controls: space=start/pause, n=next, b=back
+    window.addEventListener('keydown', (e)=>{
+      if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+      if(e.code==='Space'){ e.preventDefault(); (running?pause:start)(); }
+      if(e.key==='n'){ skip(); }
+      if(e.key==='b'){ back(); }
     });
-  });
-  const [up,down,del] = row.querySelectorAll('button');
-  up.onclick = ()=>{ if(idx>0){ const tmp = phases[idx-1]; phases[idx-1]=phases[idx]; phases[idx]=tmp; persist(); renderPhases(); } };
-  down.onclick = ()=>{ if(idx<phases.length-1){ const tmp = phases[idx+1]; phases[idx+1]=phases[idx]; phases[idx]=tmp; persist(); renderPhases(); } };
-  del.onclick = ()=>{ phases.splice(idx,1); persist(); renderPhases(); };
-  return row;
-}
-
-function renderPhases(){
-  phasesEl.innerHTML = '';
-  phases.forEach((p,i)=> phasesEl.appendChild(phaseRow(p,i)));
-}
-
-function persist(){ localStorage.setItem("jr_phases", JSON.stringify(phases)); }
-
-/* ---------- Presets ---------- */
-function applyPreset(key){
-  const sets = {
-    w1: [
-      {name:"Jump Rope", work:30, rest:30, rounds:8, color:"#7c9cff"},
-      {name:"Push-ups", work:45, rest:30, rounds:3, color:"#23d18b"}
-    ],
-    w2: [
-      {name:"Jump Rope", work:40, rest:20, rounds:10, color:"#7c9cff"},
-      {name:"Push-ups", work:50, rest:25, rounds:4, color:"#23d18b"}
-    ],
-    w3: [
-      {name:"Jump Rope", work:45, rest:15, rounds:12, color:"#7c9cff"},
-      {name:"Push-ups", work:55, rest:25, rounds:5, color:"#23d18b"}
-    ],
-    w4: [
-      {name:"Jump Rope", work:60, rest:15, rounds:12, color:"#7c9cff"},
-      {name:"Push-ups", work:60, rest:20, rounds:6, color:"#23d18b"}
-    ],
-  };
-  if(sets[key]){ phases = sets[key]; persist(); renderPhases(); resetTimer(); }
-}
-
-/* ---------- Timer Engine ---------- */
-let running = false;
-let segStart = 0;
-let timeLeft = 0;
-let rafId = null;
-
-// navigation pointers
-let pIdx = 0;      // phase index
-let round = 1;     // 1..rounds
-let segment = "work"; // "work" or "rest"
-
-function currentPhase(){ return phases[pIdx]; }
-
-function nextStep(){
-  const p = currentPhase();
-  if(!p) return false;
-
-  if(segment === "work"){
-    if(round < p.rounds){
-      if(p.rest>0) { segment = "rest"; setCountdown(p.rest); cue("rest"); return true; }
-      round++; segment = "work"; setCountdown(p.work); cue("work"); return true;
-    } else {
-      return nextPhase();
-    }
-  }
-  if(segment === "rest"){
-    round++; segment = "work"; setCountdown(p.work); cue("work"); return true;
-  }
-  return false;
-}
-
-function prevStep(){
-  if(segment === "work" && (round>1 || pIdx>0)){
-    if(round>1){ round--; segment="rest"; const p=currentPhase(); if(p.rest>0){ setCountdown(p.rest); } else { segment="work"; setCountdown(p.work);} }
-    else {
-      pIdx = Math.max(0, pIdx-1);
-      const p=currentPhase();
-      round = p.rounds;
-      if(p.rest>0){ segment="rest"; setCountdown(p.rest); }
-      else { segment="work"; setCountdown(p.work); }
-    }
-  } else if(segment==="rest"){
-    segment="work"; const p=currentPhase(); setCountdown(p.work);
-  }
-  updateUI();
-}
-
-function nextPhase(){
-  if(pIdx < phases.length-1){
-    pIdx++; round=1; segment="work"; const p=currentPhase(); setCountdown(p.work); cue("phase"); return true;
-  } else {
-    finishAll();
-    return false;
-  }
-}
-
-function setCountdown(sec){
-  timeLeft = sec;
-  segStart = performance.now();
-}
-
-function start(){
-  if(running) return;
-  if(!phases.length){ alert("Add at least one phase."); return; }
-  if(segment==="done"){ resetTimer(); }
-  running = true; $('#startPause').textContent = "Pause";
-  if(segStart===0){
-    pIdx = 0; round = 1; segment = "work"; setCountdown(currentPhase().work); cue("start");
-  }
-  tick();
-}
-
-function pause(){ running = false; $('#startPause').textContent = "Start"; cancelAnimationFrame(rafId); }
-
-function resetTimer(){
-  running = false; cancelAnimationFrame(rafId);
-  pIdx=0; round=1; segment="work"; segStart=0; timeLeft=0;
-  $('#startPause').textContent = "Start";
-  $('#status').textContent = "Ready";
-  drawRing(0, "#3a4258");
-  $('#timeLeft').textContent = "00:00";
-  $('#segmentLabel').textContent = "Ready";
-  updatePhaseInfo();
-}
-
-function finishAll(){
-  running = false; cancelAnimationFrame(rafId);
-  $('#status').textContent = "Done! 🎉";
-  $('#segmentLabel').textContent = "Complete";
-  $('#timeLeft').textContent = "00:00";
-  drawRing(0, "#3a4258");
-  beep("long"); if(navigator.vibrate) navigator.vibrate(200);
-  $('#startPause').textContent = "Restart";
-  segment = "done";
-}
-
-function cue(type){
-  if(type==="start"){ $('#status').textContent = "Started"; beep("long"); if(navigator.vibrate) navigator.vibrate(80); }
-  if(type==="work"){ $('#status').textContent = "Work"; beep("short"); if(navigator.vibrate) navigator.vibrate(50); }
-  if(type==="rest"){ $('#status').textContent = "Rest"; beep("short"); if(navigator.vibrate) navigator.vibrate(50); }
-  if(type==="phase"){ $('#status').textContent = "Next Phase"; beep("long"); if(navigator.vibrate) navigator.vibrate(80); }
-}
-
-function tick(){
-  if(!running) return;
-  const p = currentPhase();
-  if(!p){ finishAll(); return; }
-
-  const elapsed = (performance.now() - segStart)/1000;
-  const remaining = Math.max(0, Math.ceil(timeLeft - elapsed));
-
-  if($('#countdown3').checked && remaining<=3 && remaining>0){
-    beep("tick");
-  }
-
-  $('#timeLeft').textContent = fmt(remaining);
-  $('#segmentLabel').textContent = segment === "work" ? "WORK" : "REST";
-
-  updatePhaseInfo();
-
-  const segTotal = segment==="work" ? p.work : p.rest;
-  const frac = segTotal>0 ? (segTotal - Math.min(segTotal, elapsed)) / segTotal : 0;
-  drawRing(frac, p.color || "#7c9cff", segment);
-
-  if(remaining<=0){
-    beep("long"); if(navigator.vibrate) navigator.vibrate(80);
-    if(segment==="work"){
-      segment="work"; nextStep();
-    } else {
-      nextStep();
-    }
-    segStart = performance.now();
-  }
-
-  rafId = requestAnimationFrame(tick);
-}
-
-function updatePhaseInfo(){
-  const p = currentPhase();
-  if(!p){ $('#phaseInfo').textContent = ""; return; }
-  $('#phaseInfo').textContent = `${p.name} • Round ${round}/${p.rounds} • ${segment.toUpperCase()}`;
-}
-
-/* ---------- Ring Drawing ---------- */
-const ringCanvas = document.getElementById('ring');
-const ctx2 = ringCanvas.getContext('2d');
-const TAU2 = Math.PI * 2;
-
-function drawRing(frac, color, seg){
-  const W = ringCanvas.width, H = ringCanvas.height;
-  const cx = W/2, cy = H/2, r = W*0.36;
-  ctx2.clearRect(0,0,W,H);
-
-  ctx2.lineCap="round";
-  ctx2.lineWidth = 28;
-  ctx2.strokeStyle = "#1f2636";
-  ctx2.beginPath();
-  ctx2.arc(cx,cy,r,0,TAU2);
-  ctx2.stroke();
-
-  const ang = -Math.PI/2;
-  ctx2.strokeStyle = color || "#7c9cff";
-  ctx2.beginPath();
-  ctx2.arc(cx,cy,r,ang, ang + TAU2 * Math.max(0, Math.min(1, frac)), false);
-  ctx2.stroke();
-
-  ctx2.lineWidth = 8;
-  ctx2.strokeStyle = seg==="work" ? "#2e8cff" : "#21b97a";
-  ctx2.beginPath();
-  ctx2.arc(cx,cy,r-22,0,TAU2);
-  ctx2.stroke();
-}
-
-/* ---------- Sharing / Import / Export ---------- */
-$('#savePreset').onclick = ()=>{ persist(); $('#status').textContent="Saved as default"; };
-$('#exportJSON').onclick = ()=> {
-  const blob = new Blob([JSON.stringify(phases,null,2)], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'routine.json'; a.click();
-  URL.revokeObjectURL(url);
-};
-$('#importFile').onchange = (e)=>{
-  const file = e.target.files[0]; if(!file) return;
-  const fr = new FileReader();
-  fr.onload = ()=>{
-    try{
-      const data = JSON.parse(fr.result);
-      if(Array.isArray(data) && data.length){
-        phases = data; persist(); renderPhases(); resetTimer();
-      } else alert("Invalid routine file.");
-    }catch(err){ alert("Invalid JSON."); }
-  };
-  fr.readAsText(file);
-};
-$('#share').onclick = (e)=>{
-  e.preventDefault();
-  const payload = btoa(encodeURIComponent(JSON.stringify(phases)));
-  const url = `${location.origin}${location.pathname}#routine=${payload}`;
-  navigator.clipboard?.writeText(url);
-  alert("Share link copied!");
-};
-
-(function(){
-  const m = location.hash.match(/routine=([^&]+)/);
-  if(m){
-    try{
-      const data = JSON.parse(decodeURIComponent(atob(m[1])));
-      if(Array.isArray(data)&&data.length){ phases=data; persist(); }
-    }catch(e){}
-  }
-  renderPhases();
-  resetTimer();
-})();
-
-/* ---------- Builder Hooks ---------- */
-const phasesEl2 = document.getElementById('phases');
-document.getElementById('applyPreset').onclick = ()=> applyPreset(document.getElementById('presets').value);
-document.getElementById('addPhase').onclick = ()=>{
-  phases.push({name:"New Phase", work:30, rest:30, rounds:8, color:"#7c9cff"});
-  persist(); renderPhases();
-};
-document.getElementById('startPause').onclick = ()=> running ? pause() : start();
-document.getElementById('reset').onclick = ()=> resetTimer();
-document.getElementById('next').onclick = ()=> { if(segment==="done"){ resetTimer(); } else { nextStep(); segStart = performance.now(); updateUI(); } };
-document.getElementById('prev').onclick = ()=> { prevStep(); segStart = performance.now(); updateUI(); };
-
-document.documentElement.style.colorScheme = "dark";
-</script>
+  </script>
 </body>
 </html>
