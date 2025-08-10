@@ -1,455 +1,277 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Jump Rope HIIT Timer</title>
-<meta name="theme-color" content="#0b0b0c" />
-<style>
-  :root{
-    --bg:#0b0b0c; --panel:#121316; --accent:#4ade80; --accent2:#60a5fa; --warn:#f59e0b; --text:#f8fafc; --muted:#cbd5e1;
-  }
-  *{box-sizing:border-box}
-  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text);}  
-  header{padding:16px; text-align:center; font-weight:800; letter-spacing:.5px;}
-  .app{max-width:900px; margin:0 auto; padding:16px;}
-  .card{background:var(--panel); border:1px solid #1f2937; border-radius:20px; padding:20px; box-shadow:0 8px 30px rgba(0,0,0,.35)}
-  .grid{display:grid; grid-template-columns:1fr; gap:16px}
-  @media(min-width:720px){.grid{grid-template-columns:1.2fr .8fr}}
-
-  .notice{display:none; background:#7f1d1d; border:1px solid #b91c1c; color:#fee2e2; padding:10px; border-radius:12px; margin:8px 0; font-size:14px}
-  .notice.show{display:block}
-
-  .big{font-size:clamp(42px, 6vw, 86px); font-weight:900; text-align:center; line-height:1;}
-  .label{font-size:clamp(14px, 2vw, 18px); color:var(--muted); text-align:center; letter-spacing:.2px}
-  .exercise{font-size:clamp(22px, 3.2vw, 40px); text-align:center; font-weight:800; margin-top:6px}
-  .phase{display:inline-block; padding:6px 12px; border-radius:999px; font-weight:700; letter-spacing:.25px;}
-  .phase.work{background:rgba(74,222,128,.15); color:var(--accent); border:1px solid rgba(74,222,128,.4)}
-  .phase.rest{background:rgba(96,165,250,.15); color:var(--accent2); border:1px solid rgba(96,165,250,.4)}
-  .phase.setrest{background:rgba(245,158,11,.15); color:var(--warn); border:1px solid rgba(245,158,11,.4)}
-
-  .controls{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:10px}
-  button{appearance:none; border:none; cursor:pointer; background:#1e293b; color:var(--text); padding:14px 18px; border-radius:14px; font-weight:800; letter-spacing:.3px; font-size:16px}
-  button.primary{background:var(--accent); color:#0b1510}
-  button.warn{background:#334155}
-  button:disabled{opacity:.5; cursor:not-allowed}
-  .pill{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:#111827; border:1px solid #1f2937;}
-
-  .row{display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap}
-  .progress{height:14px; background:#0f172a; border:1px solid #263244; border-radius:999px; overflow:hidden}
-  .progress>div{height:100%; width:0%}
-  .progress.work>div{background:linear-gradient(90deg, rgba(74,222,128,.85), rgba(34,197,94,.9))}
-  .progress.rest>div{background:linear-gradient(90deg, rgba(96,165,250,.85), rgba(59,130,246,.9))}
-  .progress.setrest>div{background:linear-gradient(90deg, rgba(245,158,11,.85), rgba(234,88,12,.9))}
-
-  .list{max-height:420px; overflow:auto; border:1px solid #1f2937; border-radius:14px}
-  .item{display:flex; gap:10px; align-items:center; padding:10px 12px; border-bottom:1px dashed #1f2937}
-  .item:last-child{border-bottom:none}
-  .badge{min-width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-size:12px; font-weight:800; background:#0f172a; border:1px solid #1f2937;}
-  .item.active{background:rgba(59,130,246,.08)}
-
-  details.settings{background:#0d1117; border:1px solid #1f2937; border-radius:16px; padding:14px}
-  details.settings summary{cursor:pointer; font-weight:800}
-  .settings-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:12px}
-  .settings-grid label{display:grid; gap:6px; font-size:14px; color:var(--muted)}
-  input[type="number"], select{width:100%; padding:12px; border-radius:12px; border:1px solid #1f2937; background:#0b1220; color:var(--text)}
-
-  footer{opacity:.7; text-align:center; padding:16px; font-size:13px}
-
-  /* Full workout progress bar */
-  .full-progress {height:14px; background:#0f172a; border:1px solid #263244; border-radius:999px; overflow:hidden; margin-top:8px}
-  .full-progress>div{height:100%; width:0%; background:linear-gradient(90deg, rgba(250,204,21,.85), rgba(245,158,11,.9))}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jump Rope HIIT Timer</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%231f2937'/%3E%3Ccircle cx='64' cy='64' r='34' fill='%236ee7b7'/%3E%3C/svg%3E">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body { height: 100%; }
+    body { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+    * { -webkit-tap-highlight-color: transparent; }
+  </style>
 </head>
 <body>
-  <header>JUMP ROPE HIIT • <span style="opacity:.7">Bold Timer</span></header>
-  <div class="app grid">
-    <section class="card">
-      <div id="notice" class="notice">An error occurred while starting the preview. See console for details.</div>
+  <div id="root"></div>
+  <!-- React & Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+    const {useEffect, useMemo, useRef, useState} = React;
 
-      <div class="row" style="justify-content:space-between">
-        <div class="pill">Set <strong id="setNow">1</strong> / <span id="setTotal">5</span></div>
-        <div class="pill">Step <strong id="stepNow">1</strong> / <span id="stepTotal">—</span></div>
-        <div class="pill">Next: <span id="nextLabel">—</span></div>
-      </div>
+    const DEFAULT_CONFIG = {
+      rounds: 5,
+      workSec: 30,
+      restSec: 10,
+      roundRestSec: 30,
+      sequence: [
+        { type: "work", label: "Basic Bounce" },
+        { type: "work", label: "Butt Kicks (Jump Rope)" },
+        { type: "work", label: "Push-ups" },
+        { type: "work", label: "Basic Bounce" },
+        { type: "work", label: "High Knees (Jump Rope)" },
+        { type: "work", label: "Basic Bounce" },
+        { type: "work", label: "Jump Squats" },
+        { type: "work", label: "Basic Bounce" },
+        { type: "work", label: "Normal Squats" },
+      ],
+    };
 
-      <div style="text-align:center; margin:16px 0 6px">
-        <span id="phaseTag" class="phase work">WORK</span>
-      </div>
+    function secondsToHMS(s) {
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = Math.floor(s % 60);
+      return [h, m, sec].map(v => String(v).padStart(2, "0")).join(":");
+    }
 
-      <div class="exercise" id="exerciseName">Basic Bounce (Jump Rope)</div>
-      <div class="big" id="time">00:45</div>
-
-      <div class="progress work" aria-label="time progress" style="margin:10px 0 4px">
-        <div id="bar"></div>
-      </div>
-      <div class="label" id="phaseHint">Go fast but relaxed. Land light.</div>
-
-      <!-- Overall workout progress -->
-      <div class="label" style="margin-top:8px">Workout progress</div>
-      <div class="full-progress" aria-label="overall progress">
-        <div id="totalBar"></div>
-      </div>
-      <div class="row" style="gap:8px; margin-bottom:6px">
-        <div class="pill">Elapsed: <strong id="totalElapsed">00:00</strong></div>
-        <div class="pill">Remaining: <strong id="totalRemaining">00:00</strong></div>
-        <div class="pill">Total: <strong id="totalTotal">00:00</strong></div>
-      </div>
-
-      <div class="controls">
-        <button id="back">◀︎ Back</button>
-        <button id="start" class="primary">▶ Start</button>
-        <button id="pause" style="display:none" class="warn">⏸ Pause</button>
-        <button id="reset">⟲ Reset</button>
-        <button id="skip">Next ▶︎</button>
-        <button id="fs">⤢ Fullscreen</button>
-        <button id="awake">🌙 Keep Awake: Off</button>
-      </div>
-
-      <details class="settings" style="margin-top:14px">
-        <summary>Settings (durations & rounds)</summary>
-        <div class="settings-grid">
-          <label>Work (sec)
-            <input id="workSec" type="number" min="10" max="180" step="5" value="45" />
-          </label>
-          <label>Rest between moves (sec)
-            <input id="restSec" type="number" min="5" max="120" step="5" value="15" />
-          </label>
-          <label>Set rest (sec)
-            <input id="setRestSec" type="number" min="10" max="300" step="5" value="60" />
-          </label>
-          <label>Rounds (sets)
-            <input id="rounds" type="number" min="1" max="10" step="1" value="5" />
-          </label>
-        </div>
-        <div class="row" style="margin-top:10px">
-          <button id="apply" class="primary">Apply</button>
-        </div>
-      </details>
-    </section>
-
-    <aside class="card">
-      <div class="row" style="justify-content:space-between; margin-bottom:8px">
-        <div style="font-weight:800">Circuit Preview</div>
-        <div class="pill">Total Steps: <span id="previewCount">—</span></div>
-      </div>
-      <div id="list" class="list"></div>
-    </aside>
-  </div>
-
-  <footer>
-    Built for Kalana • Single-file app – just drop <code>index.html</code> in your repo and publish via GitHub Pages.
-  </footer>
-
-  <script>
-  (function(){
-    try{
-      // ===== Config =====
-      const DEFAULTS = { work:45, rest:15, setRest:60, rounds:5 };
-      const EXERCISES = [
-        'Basic Bounce (Jump Rope)',
-        'Butt Kicks (Jump Rope)',
-        'Push-ups',
-        'Basic Bounce (Jump Rope)',
-        'High Knees (Jump Rope)',
-        'Basic Bounce (Jump Rope)',
-        'Jump Squats',
-        'Basic Bounce (Jump Rope)',
-        'Normal Squats',
-      ];
-
-      const HINTS = {
-        work:{
-          'Basic Bounce (Jump Rope)':'Relax shoulders, elbows in, soft feet.',
-          'Butt Kicks (Jump Rope)':'Kick heels to glutes, quick wrists.',
-          'Push-ups':'Tight core, chest to floor, full lockout.',
-          'High Knees (Jump Rope)':'Drive knees up, stay tall, fast rope.',
-          'Jump Squats':'Hips back, soft landing, stay springy.',
-          'Normal Squats':'Knees track toes, chest proud.'
-        },
-        rest:{'*':'Breathe through the nose, shake it out.'},
-        setrest:{'*':'Walk around, sip water. Nice work!'}
-      };
-
-      // ===== State =====
-      let plan = [];
-      let settings;
-      let idx = 0; // current step index in plan
-      let timeLeft = 0; // seconds remaining in current step
-      let running = false;
-      let timer = null;
-      let totalDur = 0; // total workout seconds
-
-      // Keep-awake state
-      let wakeLock = null; // Screen Wake Lock handle
-      let keepAwakeDesired = false; // user toggle
-
-      const els = {
-        setNow: document.getElementById('setNow'),
-        setTotal: document.getElementById('setTotal'),
-        stepNow: document.getElementById('stepNow'),
-        stepTotal: document.getElementById('stepTotal'),
-        nextLabel: document.getElementById('nextLabel'),
-        phaseTag: document.getElementById('phaseTag'),
-        exerciseName: document.getElementById('exerciseName'),
-        time: document.getElementById('time'),
-        bar: document.getElementById('bar'),
-        phaseHint: document.getElementById('phaseHint'),
-        list: document.getElementById('list'),
-        previewCount: document.getElementById('previewCount'),
-        start: document.getElementById('start'),
-        pause: document.getElementById('pause'),
-        reset: document.getElementById('reset'),
-        back: document.getElementById('back'),
-        skip: document.getElementById('skip'),
-        fs: document.getElementById('fs'),
-        workSec: document.getElementById('workSec'),
-        restSec: document.getElementById('restSec'),
-        setRestSec: document.getElementById('setRestSec'),
-        rounds: document.getElementById('rounds'),
-        apply: document.getElementById('apply'),
-        totalBar: document.getElementById('totalBar'),
-        totalElapsed: document.getElementById('totalElapsed'),
-        totalRemaining: document.getElementById('totalRemaining'),
-        totalTotal: document.getElementById('totalTotal'),
-        awake: document.getElementById('awake')
-      };
-
-      function playBeep(freq, dur){
-        try{
-          const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    function useBeep() {
+      const ctxRef = useRef(null);
+      return () => {
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!ctxRef.current) ctxRef.current = new AudioCtx();
+          const ctx = ctxRef.current;
           const o = ctx.createOscillator();
           const g = ctx.createGain();
-          o.type='sine'; o.frequency.value=freq||880; o.connect(g); g.connect(ctx.destination);
-          o.start(); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (dur||140)/1000);
-          setTimeout(()=>{o.stop(); ctx.close();}, (dur||140)+50);
-        }catch(e){/* ignore for autoplay restrictions */}
-      }
-
-      function loadSettings(){
-        const raw = localStorage.getItem('jr-settings');
-        if(!raw) return {...DEFAULTS};
-        try{ return {...DEFAULTS, ...JSON.parse(raw)} }catch{ return {...DEFAULTS} }
-      }
-      function saveSettings(cfg){ localStorage.setItem('jr-settings', JSON.stringify(cfg)); }
-
-      function buildPlan(cfg){
-        const steps = [];
-        totalDur = 0;
-        for(let r=1;r<=cfg.rounds;r++){
-          for(let i=0;i<EXERCISES.length;i++){
-            const name = EXERCISES[i];
-            steps.push({type:'work', label:name, dur:cfg.work, set:r});
-            totalDur += cfg.work;
-            const isLastInSet = i===EXERCISES.length-1;
-            if(!isLastInSet){
-              steps.push({type:'rest', label:'Rest', dur:cfg.rest, set:r});
-              totalDur += cfg.rest;
-            }else if(r<cfg.rounds){
-              steps.push({type:'setrest', label:'Set Rest', dur:cfg.setRest, set:r});
-              totalDur += cfg.setRest;
-            }
-          }
-        }
-        return steps;
-      }
-
-      function fmt(sec){
-        const s = Math.max(0, Math.ceil(sec));
-        const m = Math.floor(s/60).toString().padStart(2,'0');
-        const ss = (s%60).toString().padStart(2,'0');
-        return `${m}:${ss}`;
-      }
-
-      function hintFor(step){
-        if(step.type==='work'){
-          return (HINTS.work[step.label]||'Own your pace. Form first.');
-        }
-        if(step.type==='rest') return HINTS.rest['*'];
-        return HINTS.setrest['*'];
-      }
-
-      function renderList(){
-        els.list.innerHTML='';
-        for(let i=0;i<plan.length;i++){
-          const s = plan[i];
-          const div=document.createElement('div');
-          div.className='item'+(i===idx?' active':'');
-          const badge=document.createElement('div'); badge.className='badge'; badge.textContent=(i+1);
-          const tag=document.createElement('span'); tag.className='phase '+s.type; tag.textContent=s.type==='work'?'WORK':(s.type==='rest'?'REST':'SET REST');
-          const name=document.createElement('div'); name.style.fontWeight='700'; name.textContent=s.label;
-          const dur=document.createElement('div'); dur.style.marginLeft='auto'; dur.style.opacity='.7'; dur.textContent=`${s.dur}s`;
-          div.append(badge, tag, name, dur); els.list.append(div);
-        }
-        els.previewCount.textContent=plan.length;
-      }
-
-      function applyPhaseStyles(type){
-        els.phaseTag.className='phase '+type;
-        const prog = document.querySelector('.progress');
-        prog.className='progress '+type;
-      }
-
-      function updateUI(){
-        const s = plan[idx];
-        if(!s) return;
-        els.exerciseName.textContent = s.label;
-        els.phaseTag.textContent = s.type==='work'? 'WORK' : s.type==='rest'? 'REST' : 'SET REST';
-        els.time.textContent = fmt(timeLeft);
-        els.phaseHint.textContent = hintFor(s);
-        applyPhaseStyles(s.type);
-
-        const done = Math.max(0, 1 - (timeLeft / s.dur));
-        els.bar.style.width = (done*100).toFixed(1)+'%';
-
-        els.stepNow.textContent = idx+1;
-        els.stepTotal.textContent = plan.length;
-        els.setNow.textContent = s.set;
-        els.setTotal.textContent = settings.rounds;
-
-        const next = plan[idx+1];
-        els.nextLabel.textContent = next ? (next.type==='work'? next.label : (next.type==='rest'?'Rest':'Set Rest')) : 'Done';
-
-        const items = els.list.querySelectorAll('.item');
-        for(let i=0;i<items.length;i++) items[i].classList.toggle('active', i===idx);
-
-        const elapsedBefore = plan.slice(0, idx).reduce((a,b)=>a+b.dur, 0);
-        const currStep = plan[idx] ? plan[idx].dur : 0;
-        const elapsed = Math.min(totalDur, Math.max(0, elapsedBefore + (currStep - timeLeft)));
-        const remaining = Math.max(0, totalDur - elapsed);
-        const pct = totalDur ? ((elapsed/totalDur)*100).toFixed(1) : 0;
-        els.totalBar.style.width = pct+'%';
-        els.totalElapsed.textContent = fmt(elapsed);
-        els.totalRemaining.textContent = fmt(remaining);
-        els.totalTotal.textContent = fmt(totalDur);
-      }
-
-      function stepNext(){
-        if(idx < plan.length-1){
-          idx++;
-          timeLeft = plan[idx].dur;
-          updateUI();
-        } else {
-          running=false;
-          clearInterval(timer);
-          playBeep(660,200); playBeep(440,220);
-          toggleButtons();
-          if(!keepAwakeDesired) releaseWakeLock();
-          // No alert in preview to avoid sandbox issues
-          console.log('Workout complete!');
-        }
-      }
-
-      function tick(){
-        if(!running) return;
-        timeLeft -= 0.2; // 200ms resolution (smooth bar)
-        if([3,2,1].includes(Math.ceil(timeLeft))){ playBeep(900-100*Math.ceil(timeLeft),100); }
-        if(timeLeft <= 0){ playBeep(520,200); stepNext(); }
-        updateUI();
-      }
-
-      function toggleButtons(){
-        els.start.style.display = running? 'none':'inline-block';
-        els.pause.style.display = running? 'inline-block':'none';
-      }
-
-      function start(){
-        if(running) return;
-        running=true; toggleButtons();
-        if(keepAwakeDesired) requestWakeLock();
-        timer = setInterval(tick, 200);
-      }
-      function pause(){
-        running=false; toggleButtons(); clearInterval(timer);
-        if(!keepAwakeDesired) releaseWakeLock();
-      }
-      function reset(){ pause(); idx=0; timeLeft=plan[0].dur; updateUI(); }
-      function skip(){ timeLeft=0.01; }
-      function back(){ if(idx>0){ idx--; timeLeft=plan[idx].dur; updateUI(); } }
-
-      function enterFS(){
-        const el = document.documentElement; if(el.requestFullscreen) el.requestFullscreen();
-      }
-
-      function applyFromInputs(){
-        const cfg = {
-          work: +els.workSec.value || DEFAULTS.work,
-          rest: +els.restSec.value || DEFAULTS.rest,
-          setRest: +els.setRestSec.value || DEFAULTS.setRest,
-          rounds: Math.max(1, Math.min(10, +els.rounds.value || DEFAULTS.rounds))
-        };
-        saveSettings(cfg);
-        init(cfg);
-      }
-
-      function fillInputs(cfg){
-        els.workSec.value = cfg.work;
-        els.restSec.value = cfg.rest;
-        els.setRestSec.value = cfg.setRest;
-        els.rounds.value = cfg.rounds;
-      }
-
-      function init(cfg){
-        settings = cfg;
-        plan = buildPlan(settings);
-        totalDur = plan.reduce((a,b)=>a+b.dur, 0);
-        idx = 0; timeLeft = plan[0].dur; running=false; clearInterval(timer);
-        renderList(); updateUI(); toggleButtons();
-      }
-
-      // ===== Keep screen awake (Screen Wake Lock API) =====
-      async function requestWakeLock(){
-        try{
-          if('wakeLock' in navigator){
-            wakeLock = await navigator.wakeLock.request('screen');
-            wakeLock.addEventListener('release', ()=>{});
-            document.addEventListener('visibilitychange', async ()=>{
-              if(document.visibilityState==='visible' && keepAwakeDesired && !wakeLock){
-                try{ wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
-              }
-            });
-          }
-        }catch(e){ /* ignore */ }
-      }
-      function releaseWakeLock(){ try{ if(wakeLock){ wakeLock.release(); } }catch(e){} finally { wakeLock=null; }
-      function toggleAwake(){
-        keepAwakeDesired = !keepAwakeDesired;
-        els.awake.textContent = keepAwakeDesired ? '🌙 Keep Awake: On' : '🌙 Keep Awake: Off';
-        if(keepAwakeDesired){ requestWakeLock(); }
-        else { releaseWakeLock(); }
-      }
-
-      // ===== bootstrap =====
-      let bootstrapError=null;
-      try{
-        const loaded = loadSettings();
-        fillInputs(loaded);
-        init(loaded);
-
-        // events
-        els.start.onclick = start;
-        els.pause.onclick = pause;
-        els.reset.onclick = reset;
-        els.skip.onclick = skip;
-        els.back.onclick = back;
-        els.fs.onclick = enterFS;
-        els.apply.onclick = applyFromInputs;
-        els.awake.onclick = toggleAwake;
-
-        window.addEventListener('keydown', (e)=>{
-          const tag = document.activeElement && document.activeElement.tagName;
-          if(tag==='INPUT' || tag==='SELECT' || tag==='TEXTAREA') return;
-          if(e.code==='Space'){ e.preventDefault(); (running?pause:start)(); }
-          if(e.key==='n'){ skip(); }
-          if(e.key==='b'){ back(); }
-        });
-      }catch(e){ bootstrapError=e; throw e; }
-
-    }catch(e){
-      console.error(e);
-      var n=document.getElementById('notice'); if(n){ n.textContent='Preview error: '+ (e && e.message ? e.message : e); n.classList.add('show'); }
+          o.type = "sine";
+          o.frequency.value = 880;
+          g.gain.setValueAtTime(0.001, ctx.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+          o.connect(g); g.connect(ctx.destination);
+          o.start(); o.stop(ctx.currentTime + 0.25);
+        } catch {}
+      };
     }
-  })();
-  </script>
-</body>
-</html>
+
+    function App() {
+      const [config, setConfig] = useState(DEFAULT_CONFIG);
+      const [isRunning, setIsRunning] = useState(false);
+      const [softPaused, setSoftPaused] = useState(false);
+      const [tick, setTick] = useState(0);
+      const [elapsed, setElapsed] = useState(0);
+
+      const beep = useBeep();
+
+      // --- Wake Lock + NoSleep fallback
+      const wakeLockRef = useRef(null);
+      const noSleepRef = useRef(null);
+
+      const loadNoSleep = async () => {
+        if (noSleepRef.current || window.NoSleep) return noSleepRef.current || new window.NoSleep();
+        return new Promise((resolve) => {
+          const s = document.createElement('script');
+          s.src = 'https://unpkg.com/nosleep.js@0.12.0/dist/NoSleep.min.js';
+          s.async = true;
+          s.onload = () => {
+            try {
+              const ns = new window.NoSleep();
+              noSleepRef.current = ns;
+              resolve(ns);
+            } catch (e) { resolve(null); }
+          };
+          s.onerror = () => resolve(null);
+          document.head.appendChild(s);
+        });
+      };
+
+      const requestWakeLock = async () => {
+        try {
+          if ('wakeLock' in navigator && !wakeLockRef.current) {
+            wakeLockRef.current = await navigator.wakeLock.request('screen');
+            wakeLockRef.current.addEventListener?.('release', () => {});
+          }
+        } catch {}
+      };
+
+      const releaseWakeLock = async () => {
+        try { await wakeLockRef.current?.release?.(); } catch {}
+        wakeLockRef.current = null;
+      };
+
+      const enableKeepAwake = async () => {
+        await requestWakeLock();
+        try {
+          const ns = (await loadNoSleep()) || null;
+          ns && ns.enable && ns.enable();
+        } catch {}
+      };
+
+      const disableKeepAwake = async () => {
+        try { noSleepRef.current && noSleepRef.current.disable && noSleepRef.current.disable(); } catch {}
+        await releaseWakeLock();
+      };
+
+      const timeline = useMemo(() => {
+        const items = [];
+        for (let r = 1; r <= config.rounds; r++) {
+          config.sequence.forEach((step, i) => {
+            items.push({ phase: step.type, label: step.label, duration: config.workSec, round: r, idxInRound: i + 1 });
+            if (i < config.sequence.length - 1) {
+              items.push({ phase: "rest", label: "Rest", duration: config.restSec, round: r, idxInRound: i + 1 });
+            }
+          });
+          if (r < config.rounds && config.roundRestSec > 0) {
+            items.push({ phase: "round-rest", label: "Round Rest", duration: config.roundRestSec, round: r, idxInRound: config.sequence.length });
+          }
+        }
+        let t = 0;
+        items.forEach((it) => { it.start = t; t += it.duration; it.end = t; });
+        items.totalDuration = t;
+        return items;
+      }, [config]);
+
+      const current = useMemo(() => {
+        const t = elapsed;
+        const item = timeline.find((it) => t >= it.start && t < it.end) || null;
+        const remainingInItem = item ? Math.ceil(item.end - t) : 0;
+        const remainingTotal = Math.max(0, Math.ceil(timeline.totalDuration - t));
+        const progress = timeline.totalDuration ? Math.min(1, t / timeline.totalDuration) : 0;
+        return { item, remainingInItem, remainingTotal, progress };
+      }, [elapsed, timeline]);
+
+      useEffect(() => {
+        const onVis = () => {
+          if (document.visibilityState === 'visible' && isRunning && !softPaused) enableKeepAwake();
+        };
+        document.addEventListener('visibilitychange', onVis);
+        return () => document.removeEventListener('visibilitychange', onVis);
+      }, [isRunning, softPaused]);
+
+      useEffect(() => {
+        if (!isRunning || softPaused) return;
+        const id = setInterval(() => setTick((x) => x + 1), 250);
+        return () => clearInterval(id);
+      }, [isRunning, softPaused]);
+
+      useEffect(() => {
+        if (!isRunning || softPaused) return;
+        setElapsed((t) => Math.min(t + 0.25, timeline.totalDuration));
+      }, [tick, isRunning, softPaused, timeline.totalDuration]);
+
+      const lastPhaseRef = useRef(null);
+      useEffect(() => {
+        const cur = current.item?.phase;
+        if (cur && cur !== lastPhaseRef.current && isRunning) {
+          beep();
+          lastPhaseRef.current = cur;
+        }
+      }, [current.item?.phase, isRunning, beep]);
+
+      const start = () => {
+        if (elapsed >= timeline.totalDuration) setElapsed(0);
+        setIsRunning(true);
+        setSoftPaused(false);
+        enableKeepAwake();
+      };
+      const pause = () => { setSoftPaused(true); disableKeepAwake(); };
+      const resume = () => { setSoftPaused(false); enableKeepAwake(); };
+      const reset = () => {
+        setIsRunning(false);
+        setSoftPaused(false);
+        setElapsed(0);
+        lastPhaseRef.current = null;
+        disableKeepAwake();
+      };
+
+      const skipNext = () => { const item = current.item; if (!item) return; setElapsed(item.end); };
+      const skipPrev = () => {
+        const t = elapsed - 0.25;
+        const idx = timeline.findIndex((it) => t >= it.start && t < it.end);
+        if (idx > 0) setElapsed(timeline[idx - 1].start); else setElapsed(0);
+      };
+
+      const updateNumber = (key, v) => setConfig((c) => ({ ...c, [key]: Math.max(0, Math.floor(v || 0)) }));
+      const phaseColor = (phase) => phase === "work" ? "bg-green-600" : phase === "rest" ? "bg-yellow-600" : phase === "round-rest" ? "bg-blue-700" : "bg-slate-700";
+      const percent = (n) => `${Math.round(n * 100)}%`;
+
+      useEffect(() => () => { disableKeepAwake(); }, []);
+
+      return (
+        <div className="min-h-screen w-full bg-slate-900 text-slate-100 flex flex-col items-center p-4 md:p-8">
+          <div className="w-full max-w-3xl">
+            <header className="flex items-center justify-between mb-4 md:mb-6">
+              <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight">Jump Rope HIIT Timer</h1>
+              <div className="text-right">
+                <div className="text-xs uppercase tracking-widest text-slate-400">Session Remaining</div>
+                <div className="text-xl md:text-2xl font-bold tabular-nums">{secondsToHMS(current.remainingTotal)}</div>
+              </div>
+            </header>
+
+            <div className="rounded-2xl bg-slate-800 shadow-xl p-4 md:p-6 grid gap-4">
+              <div className={`rounded-xl ${phaseColor(current.item?.phase)} p-4 md:p-6 flex items-center justify-between shadow-inner`}>
+                <div>
+                  <div className="text-xs md:text-sm uppercase tracking-widest opacity-90">{current.item?.phase === "work" ? "Work" : current.item?.phase === "rest" ? "Rest" : current.item?.phase === "round-rest" ? "Round Rest" : "Ready"}</div>
+                  <div className="text-2xl md:text-5xl font-extrabold leading-tight">{current.item?.label || "Press Start"}</div>
+                  <div className="text-sm md:text-base opacity-90">Round {current.item?.round || 1} / {config.rounds} • Move {current.item?.idxInRound || 1} / {config.sequence.length}</div>
+                </div>
+                <div className="text-4xl md:text-7xl font-black tabular-nums">{secondsToHMS(current.remainingInItem || (isRunning ? 0 : config.workSec))}</div>
+              </div>
+
+              <div className="w-full bg-slate-700 rounded-full h-3 md:h-4 overflow-hidden">
+                <div className="h-full bg-slate-200" style={{ width: percent(current.progress) }} />
+              </div>
+
+              <div className="flex flex-wrap gap-2 md:gap-3">
+                {!isRunning && (
+                  <button onClick={start} className="px-4 py-2 md:px-6 md:py-3 rounded-xl bg-green-600 hover:bg-green-700 font-bold">Start</button>
+                )}
+                {isRunning && !softPaused && (
+                  <button onClick={pause} className="px-4 py-2 md:px-6 md:py-3 rounded-xl bg-yellow-600 hover:bg-yellow-700 font-bold">Pause</button>
+                )}
+                {isRunning && softPaused && (
+                  <button onClick={resume} className="px-4 py-2 md:px-6 md:py-3 rounded-xl bg-green-600 hover:bg-green-700 font-bold">Resume</button>
+                )}
+                <button onClick={reset} className="px-4 py-2 md:px-6 md:py-3 rounded-xl bg-slate-600 hover:bg-slate-500 font-bold">Reset</button>
+                <button onClick={skipPrev} className="px-4 py-2 md:px-6 md:py-3 rounded-xl bg-slate-700 hover:bg-slate-600 font-bold">⟵ Prev</button>
+                <button onClick={skipNext} className="px-4 py-2 md:px-6 md:py-3 rounded-xl bg-slate-700 hover:bg-slate-600 font-bold">Next ⟶</button>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl bg-slate-800 p-4 md:p-6">
+              <div className="text-lg md:text-xl font-bold mb-4">Settings</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                <NumField label="Rounds" value={config.rounds} onChange={(v) => updateNumber("rounds", v)} />
+                <NumField label="Work (sec)" value={config.workSec} onChange={(v) => updateNumber("workSec", v)} />
+                <NumField label="Rest (sec)" value={config.restSec} onChange={(v) => updateNumber("restSec", v)} />
+                <NumField label="Round Rest (sec)" value={config.roundRestSec} onChange={(v) => updateNumber("roundRestSec", v)} />
+              </div>
+              <div className="mt-4 text-sm text-slate-300">Total Session: <span className="font-bold text-slate-100">{secondsToHMS(timeline.totalDuration || 0)}</span></div>
+            </div>
+
+            <div className="mt-6 grid gap-2">
+              <div className="text-sm uppercase tracking-widest text-slate-400">Up Next</div>
+              <div className="grid gap-2 max-h-64 overflow-auto pr-1">
+                {timeline.map((it, i) => {
+                  const active = current.item && current.item.start === it.start;
+                  return (
+                    <div key={i} className={`p-3 rounded-xl flex items-center justify-between ${active ? "bg-slate-700" : "bg-slate-800"}`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-block w-2 h-2 rounded-full ${it.phase === "work" ? "bg-green-400" : it.phase === "rest" ? "bg-yellow-400" : "bg-blue-400"}`} />
+                        <div className="font-semibold">{it.label}</div>
+                      </div>\n                      <div className="text-sm tabular-nums text-slate-300">R{it.round} • {secondsToHMS(it.duration)}</div>
+                    </div>\n                  );\n                })}\n              </div>\n            </div>\n\n            <footer className="mt-8 text-center text-xs text-slate-400">\n              Tip: Add this page to your phone's Home Screen for a full-screen timer experience.\n            </footer>\n          </div>\n        </div>\n      );\n    }\n\n    function NumField({ label, value, onChange }) {\n      return (\n        <label className="grid gap-1">\n          <span className="text-xs uppercase tracking-widest text-slate-400">{label}</span>\n          <input\n            type="number"\n            className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 font-bold"\n            value={value}\n            min={0}\n            onChange={(e) => onChange(parseInt(e.target.value, 10))}\n          />\n        </label>\n      );\n    }\n\n    const root = ReactDOM.createRoot(document.getElementById('root'));\n    root.render(<App />);\n  </script>\n</body>\n</html>\n
