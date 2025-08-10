@@ -10,12 +10,15 @@
     --bg:#0b0b0c; --panel:#121316; --accent:#4ade80; --accent2:#60a5fa; --warn:#f59e0b; --text:#f8fafc; --muted:#cbd5e1;
   }
   *{box-sizing:border-box}
-  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text);}
+  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text);}  
   header{padding:16px; text-align:center; font-weight:800; letter-spacing:.5px;}
   .app{max-width:900px; margin:0 auto; padding:16px;}
   .card{background:var(--panel); border:1px solid #1f2937; border-radius:20px; padding:20px; box-shadow:0 8px 30px rgba(0,0,0,.35)}
   .grid{display:grid; grid-template-columns:1fr; gap:16px}
   @media(min-width:720px){.grid{grid-template-columns:1.2fr .8fr}}
+
+  .notice{display:none; background:#7f1d1d; border:1px solid #b91c1c; color:#fee2e2; padding:10px; border-radius:12px; margin:8px 0; font-size:14px}
+  .notice.show{display:block}
 
   .big{font-size:clamp(42px, 6vw, 86px); font-weight:900; text-align:center; line-height:1;}
   .label{font-size:clamp(14px, 2vw, 18px); color:var(--muted); text-align:center; letter-spacing:.2px}
@@ -62,9 +65,11 @@
   <header>JUMP ROPE HIIT • <span style="opacity:.7">Bold Timer</span></header>
   <div class="app grid">
     <section class="card">
+      <div id="notice" class="notice">An error occurred while starting the preview. See console for details.</div>
+
       <div class="row" style="justify-content:space-between">
         <div class="pill">Set <strong id="setNow">1</strong> / <span id="setTotal">5</span></div>
-        <div class="pill">Step <strong id="stepNow">1</strong> / <span id="stepTotal">45</span></div>
+        <div class="pill">Step <strong id="stepNow">1</strong> / <span id="stepTotal">—</span></div>
         <div class="pill">Next: <span id="nextLabel">—</span></div>
       </div>
 
@@ -98,6 +103,7 @@
         <button id="reset">⟲ Reset</button>
         <button id="skip">Next ▶︎</button>
         <button id="fs">⤢ Fullscreen</button>
+        <button id="awake">🌙 Keep Awake: Off</button>
       </div>
 
       <details class="settings" style="margin-top:14px">
@@ -135,262 +141,315 @@
     Built for Kalana • Single-file app – just drop <code>index.html</code> in your repo and publish via GitHub Pages.
   </footer>
 
-  <audio id="beep"></audio>
-
   <script>
-    // ===== Config =====
-    const DEFAULTS = { work:45, rest:15, setRest:60, rounds:5 };
-    const EXERCISES = [
-      'Basic Bounce (Jump Rope)',
-      'Butt Kicks (Jump Rope)',
-      'Push-ups',
-      'Basic Bounce (Jump Rope)',
-      'High Knees (Jump Rope)',
-      'Basic Bounce (Jump Rope)',
-      'Jump Squats',
-      'Basic Bounce (Jump Rope)',
-      'Normal Squats',
-    ];
+  (function(){
+    try{
+      // ===== Config =====
+      const DEFAULTS = { work:45, rest:15, setRest:60, rounds:5 };
+      const EXERCISES = [
+        'Basic Bounce (Jump Rope)',
+        'Butt Kicks (Jump Rope)',
+        'Push-ups',
+        'Basic Bounce (Jump Rope)',
+        'High Knees (Jump Rope)',
+        'Basic Bounce (Jump Rope)',
+        'Jump Squats',
+        'Basic Bounce (Jump Rope)',
+        'Normal Squats',
+      ];
 
-    const HINTS = {
-      work:{
-        'Basic Bounce (Jump Rope)':'Relax shoulders, elbows in, soft feet.',
-        'Butt Kicks (Jump Rope)':'Kick heels to glutes, quick wrists.',
-        'Push-ups':'Tight core, chest to floor, full lockout.',
-        'High Knees (Jump Rope)':'Drive knees up, stay tall, fast rope.',
-        'Jump Squats':'Hips back, soft landing, stay springy.',
-        'Normal Squats':'Knees track toes, chest proud.'
-      },
-      rest:{'*':'Breathe through the nose, shake it out.'},
-      setrest:{'*':'Walk around, sip water. Nice work!'}
-    };
-
-    // Simple beep generator (WebAudio) for 3-2-1 and transitions
-    function playBeep(freq=880, dur=140){
-      try{
-        const ctx = new (window.AudioContext||window.webkitAudioContext)();
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type='sine'; o.frequency.value=freq; o.connect(g); g.connect(ctx.destination);
-        o.start(); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur/1000);
-        setTimeout(()=>{o.stop(); ctx.close();}, dur+50);
-      }catch(e){/* ignore */}
-    }
-
-    // ===== State =====
-    let plan = [];
-    let idx = 0; // current step index in plan
-    let timeLeft = 0; // seconds remaining in current step
-    let running = false;
-    let timer = null;
-    let totalDur = 0; // total workout seconds
-
-    const els = {
-      setNow: document.getElementById('setNow'),
-      setTotal: document.getElementById('setTotal'),
-      stepNow: document.getElementById('stepNow'),
-      stepTotal: document.getElementById('stepTotal'),
-      nextLabel: document.getElementById('nextLabel'),
-      phaseTag: document.getElementById('phaseTag'),
-      exerciseName: document.getElementById('exerciseName'),
-      time: document.getElementById('time'),
-      bar: document.getElementById('bar'),
-      phaseHint: document.getElementById('phaseHint'),
-      list: document.getElementById('list'),
-      previewCount: document.getElementById('previewCount'),
-      start: document.getElementById('start'),
-      pause: document.getElementById('pause'),
-      reset: document.getElementById('reset'),
-      back: document.getElementById('back'),
-      skip: document.getElementById('skip'),
-      fs: document.getElementById('fs'),
-      workSec: document.getElementById('workSec'),
-      restSec: document.getElementById('restSec'),
-      setRestSec: document.getElementById('setRestSec'),
-      rounds: document.getElementById('rounds'),
-      apply: document.getElementById('apply'),
-      // New overall progress refs
-      totalBar: document.getElementById('totalBar'),
-      totalElapsed: document.getElementById('totalElapsed'),
-      totalRemaining: document.getElementById('totalRemaining'),
-      totalTotal: document.getElementById('totalTotal')
-    };
-
-    function loadSettings(){
-      const raw = localStorage.getItem('jr-settings');
-      if(!raw) return {...DEFAULTS};
-      try{ return {...DEFAULTS, ...JSON.parse(raw)} }catch{ return {...DEFAULTS} }
-    }
-    function saveSettings(cfg){ localStorage.setItem('jr-settings', JSON.stringify(cfg)); }
-
-    function buildPlan(cfg){
-      const steps = [];
-      totalDur = 0;
-      for(let r=1;r<=cfg.rounds;r++){
-        EXERCISES.forEach((name, i)=>{
-          steps.push({type:'work', label:name, dur:cfg.work, set:r});
-          totalDur += cfg.work;
-          const isLastInSet = i===EXERCISES.length-1;
-          if(!isLastInSet){
-            steps.push({type:'rest', label:'Rest', dur:cfg.rest, set:r});
-            totalDur += cfg.rest;
-          }else if(r<cfg.rounds){
-            steps.push({type:'setrest', label:'Set Rest', dur:cfg.setRest, set:r});
-            totalDur += cfg.setRest;
-          }
-        });
-      }
-      return steps;
-    }
-
-    function fmt(sec){
-      const s = Math.max(0, Math.ceil(sec));
-      const m = Math.floor(s/60).toString().padStart(2,'0');
-      const ss = (s%60).toString().padStart(2,'0');
-      return `${m}:${ss}`;
-    }
-
-    function hintFor(step){
-      if(step.type==='work'){
-        return (HINTS.work[step.label]||'Own your pace. Form first.');
-      }
-      if(step.type==='rest') return HINTS.rest['*'];
-      return HINTS.setrest['*'];
-    }
-
-    function renderList(){
-      els.list.innerHTML='';
-      plan.forEach((s,i)=>{
-        const div=document.createElement('div');
-        div.className='item'+(i===idx?' active':'');
-        const badge=document.createElement('div'); badge.className='badge'; badge.textContent=(i+1);
-        const tag=document.createElement('span'); tag.className='phase '+s.type; tag.textContent=s.type==='work'?'WORK':(s.type==='rest'?'REST':'SET REST');
-        const name=document.createElement('div'); name.style.fontWeight='700'; name.textContent=s.type==='work'?s.label:s.label;
-        const dur=document.createElement('div'); dur.style.marginLeft='auto'; dur.style.opacity='.7'; dur.textContent=`${s.dur}s`;
-        div.append(badge, tag, name, dur); els.list.append(div);
-      })
-      els.previewCount.textContent=plan.length;
-    }
-
-    function applyPhaseStyles(type){
-      els.phaseTag.className='phase '+type;
-      const prog = document.querySelector('.progress');
-      prog.className='progress '+type;
-    }
-
-    function updateUI(){
-      const s = plan[idx];
-      if(!s) return;
-      els.exerciseName.textContent = s.type==='work'? s.label : s.label;
-      els.phaseTag.textContent = s.type==='work'? 'WORK' : s.type==='rest'? 'REST' : 'SET REST';
-      els.time.textContent = fmt(timeLeft);
-      els.phaseHint.textContent = hintFor(s);
-      applyPhaseStyles(s.type);
-
-      // progress bar (current step)
-      const done = Math.max(0, 1 - (timeLeft / s.dur));
-      els.bar.style.width = (done*100).toFixed(1)+'%';
-
-      // meta
-      els.stepNow.textContent = idx+1;
-      els.stepTotal.textContent = plan.length;
-      els.setNow.textContent = s.set;
-      els.setTotal.textContent = settings.rounds;
-
-      // next label
-      const next = plan[idx+1];
-      els.nextLabel.textContent = next ? (next.type==='work'? next.label : (next.type==='rest'?'Rest':'Set Rest')) : 'Done';
-
-      // highlight active item
-      const items = els.list.querySelectorAll('.item');
-      items.forEach((e,i)=> e.classList.toggle('active', i===idx));
-
-      // overall progress
-      const elapsedBefore = plan.slice(0, idx).reduce((a,b)=>a+b.dur, 0);
-      const elapsed = Math.min(totalDur, Math.max(0, elapsedBefore + (plan[idx]?.dur - timeLeft)));
-      const remaining = Math.max(0, totalDur - elapsed);
-      const pct = totalDur ? ((elapsed/totalDur)*100).toFixed(1) : 0;
-      document.getElementById('totalBar').style.width = pct+'%';
-      els.totalElapsed.textContent = fmt(elapsed);
-      els.totalRemaining.textContent = fmt(remaining);
-      els.totalTotal.textContent = fmt(totalDur);
-    }
-
-    function stepNext(){
-      if(idx < plan.length-1){ idx++; timeLeft = plan[idx].dur; updateUI(); }
-      else { running=false; clearInterval(timer); playBeep(660,200); playBeep(440,220); alert('Workout complete! Nice job.'); toggleButtons(); }
-    }
-
-    function tick(){
-      if(!running) return;
-      timeLeft -= 0.2; // 200ms resolution (smooth bar)
-      if([3,2,1].includes(Math.ceil(timeLeft))){ playBeep(900-100*Math.ceil(timeLeft),100); }
-      if(timeLeft <= 0){ playBeep(520,200); stepNext(); }
-      updateUI();
-    }
-
-    function toggleButtons(){
-      els.start.style.display = running? 'none':'inline-block';
-      els.pause.style.display = running? 'inline-block':'none';
-    }
-
-    function start(){ if(running) return; running=true; toggleButtons(); timer = setInterval(tick, 200); }
-    function pause(){ running=false; toggleButtons(); clearInterval(timer); }
-    function reset(){ pause(); idx=0; timeLeft=plan[0].dur; updateUI(); }
-    function skip(){ timeLeft=0.01; }
-    function back(){ if(idx>0){ idx--; timeLeft=plan[idx].dur; updateUI(); } }
-
-    function enterFS(){
-      const el = document.documentElement; if(el.requestFullscreen) el.requestFullscreen();
-    }
-
-    function applyFromInputs(){
-      const cfg = {
-        work: +els.workSec.value || DEFAULTS.work,
-        rest: +els.restSec.value || DEFAULTS.rest,
-        setRest: +els.setRestSec.value || DEFAULTS.setRest,
-        rounds: Math.max(1, Math.min(10, +els.rounds.value || DEFAULTS.rounds))
+      const HINTS = {
+        work:{
+          'Basic Bounce (Jump Rope)':'Relax shoulders, elbows in, soft feet.',
+          'Butt Kicks (Jump Rope)':'Kick heels to glutes, quick wrists.',
+          'Push-ups':'Tight core, chest to floor, full lockout.',
+          'High Knees (Jump Rope)':'Drive knees up, stay tall, fast rope.',
+          'Jump Squats':'Hips back, soft landing, stay springy.',
+          'Normal Squats':'Knees track toes, chest proud.'
+        },
+        rest:{'*':'Breathe through the nose, shake it out.'},
+        setrest:{'*':'Walk around, sip water. Nice work!'}
       };
-      saveSettings(cfg);
-      init(cfg);
+
+      // ===== State =====
+      let plan = [];
+      let settings;
+      let idx = 0; // current step index in plan
+      let timeLeft = 0; // seconds remaining in current step
+      let running = false;
+      let timer = null;
+      let totalDur = 0; // total workout seconds
+
+      // Keep-awake state
+      let wakeLock = null; // Screen Wake Lock handle
+      let keepAwakeDesired = false; // user toggle
+
+      const els = {
+        setNow: document.getElementById('setNow'),
+        setTotal: document.getElementById('setTotal'),
+        stepNow: document.getElementById('stepNow'),
+        stepTotal: document.getElementById('stepTotal'),
+        nextLabel: document.getElementById('nextLabel'),
+        phaseTag: document.getElementById('phaseTag'),
+        exerciseName: document.getElementById('exerciseName'),
+        time: document.getElementById('time'),
+        bar: document.getElementById('bar'),
+        phaseHint: document.getElementById('phaseHint'),
+        list: document.getElementById('list'),
+        previewCount: document.getElementById('previewCount'),
+        start: document.getElementById('start'),
+        pause: document.getElementById('pause'),
+        reset: document.getElementById('reset'),
+        back: document.getElementById('back'),
+        skip: document.getElementById('skip'),
+        fs: document.getElementById('fs'),
+        workSec: document.getElementById('workSec'),
+        restSec: document.getElementById('restSec'),
+        setRestSec: document.getElementById('setRestSec'),
+        rounds: document.getElementById('rounds'),
+        apply: document.getElementById('apply'),
+        totalBar: document.getElementById('totalBar'),
+        totalElapsed: document.getElementById('totalElapsed'),
+        totalRemaining: document.getElementById('totalRemaining'),
+        totalTotal: document.getElementById('totalTotal'),
+        awake: document.getElementById('awake')
+      };
+
+      function playBeep(freq, dur){
+        try{
+          const ctx = new (window.AudioContext||window.webkitAudioContext)();
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type='sine'; o.frequency.value=freq||880; o.connect(g); g.connect(ctx.destination);
+          o.start(); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (dur||140)/1000);
+          setTimeout(()=>{o.stop(); ctx.close();}, (dur||140)+50);
+        }catch(e){/* ignore for autoplay restrictions */}
+      }
+
+      function loadSettings(){
+        const raw = localStorage.getItem('jr-settings');
+        if(!raw) return {...DEFAULTS};
+        try{ return {...DEFAULTS, ...JSON.parse(raw)} }catch{ return {...DEFAULTS} }
+      }
+      function saveSettings(cfg){ localStorage.setItem('jr-settings', JSON.stringify(cfg)); }
+
+      function buildPlan(cfg){
+        const steps = [];
+        totalDur = 0;
+        for(let r=1;r<=cfg.rounds;r++){
+          for(let i=0;i<EXERCISES.length;i++){
+            const name = EXERCISES[i];
+            steps.push({type:'work', label:name, dur:cfg.work, set:r});
+            totalDur += cfg.work;
+            const isLastInSet = i===EXERCISES.length-1;
+            if(!isLastInSet){
+              steps.push({type:'rest', label:'Rest', dur:cfg.rest, set:r});
+              totalDur += cfg.rest;
+            }else if(r<cfg.rounds){
+              steps.push({type:'setrest', label:'Set Rest', dur:cfg.setRest, set:r});
+              totalDur += cfg.setRest;
+            }
+          }
+        }
+        return steps;
+      }
+
+      function fmt(sec){
+        const s = Math.max(0, Math.ceil(sec));
+        const m = Math.floor(s/60).toString().padStart(2,'0');
+        const ss = (s%60).toString().padStart(2,'0');
+        return `${m}:${ss}`;
+      }
+
+      function hintFor(step){
+        if(step.type==='work'){
+          return (HINTS.work[step.label]||'Own your pace. Form first.');
+        }
+        if(step.type==='rest') return HINTS.rest['*'];
+        return HINTS.setrest['*'];
+      }
+
+      function renderList(){
+        els.list.innerHTML='';
+        for(let i=0;i<plan.length;i++){
+          const s = plan[i];
+          const div=document.createElement('div');
+          div.className='item'+(i===idx?' active':'');
+          const badge=document.createElement('div'); badge.className='badge'; badge.textContent=(i+1);
+          const tag=document.createElement('span'); tag.className='phase '+s.type; tag.textContent=s.type==='work'?'WORK':(s.type==='rest'?'REST':'SET REST');
+          const name=document.createElement('div'); name.style.fontWeight='700'; name.textContent=s.label;
+          const dur=document.createElement('div'); dur.style.marginLeft='auto'; dur.style.opacity='.7'; dur.textContent=`${s.dur}s`;
+          div.append(badge, tag, name, dur); els.list.append(div);
+        }
+        els.previewCount.textContent=plan.length;
+      }
+
+      function applyPhaseStyles(type){
+        els.phaseTag.className='phase '+type;
+        const prog = document.querySelector('.progress');
+        prog.className='progress '+type;
+      }
+
+      function updateUI(){
+        const s = plan[idx];
+        if(!s) return;
+        els.exerciseName.textContent = s.label;
+        els.phaseTag.textContent = s.type==='work'? 'WORK' : s.type==='rest'? 'REST' : 'SET REST';
+        els.time.textContent = fmt(timeLeft);
+        els.phaseHint.textContent = hintFor(s);
+        applyPhaseStyles(s.type);
+
+        const done = Math.max(0, 1 - (timeLeft / s.dur));
+        els.bar.style.width = (done*100).toFixed(1)+'%';
+
+        els.stepNow.textContent = idx+1;
+        els.stepTotal.textContent = plan.length;
+        els.setNow.textContent = s.set;
+        els.setTotal.textContent = settings.rounds;
+
+        const next = plan[idx+1];
+        els.nextLabel.textContent = next ? (next.type==='work'? next.label : (next.type==='rest'?'Rest':'Set Rest')) : 'Done';
+
+        const items = els.list.querySelectorAll('.item');
+        for(let i=0;i<items.length;i++) items[i].classList.toggle('active', i===idx);
+
+        const elapsedBefore = plan.slice(0, idx).reduce((a,b)=>a+b.dur, 0);
+        const currStep = plan[idx] ? plan[idx].dur : 0;
+        const elapsed = Math.min(totalDur, Math.max(0, elapsedBefore + (currStep - timeLeft)));
+        const remaining = Math.max(0, totalDur - elapsed);
+        const pct = totalDur ? ((elapsed/totalDur)*100).toFixed(1) : 0;
+        els.totalBar.style.width = pct+'%';
+        els.totalElapsed.textContent = fmt(elapsed);
+        els.totalRemaining.textContent = fmt(remaining);
+        els.totalTotal.textContent = fmt(totalDur);
+      }
+
+      function stepNext(){
+        if(idx < plan.length-1){
+          idx++;
+          timeLeft = plan[idx].dur;
+          updateUI();
+        } else {
+          running=false;
+          clearInterval(timer);
+          playBeep(660,200); playBeep(440,220);
+          toggleButtons();
+          if(!keepAwakeDesired) releaseWakeLock();
+          // No alert in preview to avoid sandbox issues
+          console.log('Workout complete!');
+        }
+      }
+
+      function tick(){
+        if(!running) return;
+        timeLeft -= 0.2; // 200ms resolution (smooth bar)
+        if([3,2,1].includes(Math.ceil(timeLeft))){ playBeep(900-100*Math.ceil(timeLeft),100); }
+        if(timeLeft <= 0){ playBeep(520,200); stepNext(); }
+        updateUI();
+      }
+
+      function toggleButtons(){
+        els.start.style.display = running? 'none':'inline-block';
+        els.pause.style.display = running? 'inline-block':'none';
+      }
+
+      function start(){
+        if(running) return;
+        running=true; toggleButtons();
+        if(keepAwakeDesired) requestWakeLock();
+        timer = setInterval(tick, 200);
+      }
+      function pause(){
+        running=false; toggleButtons(); clearInterval(timer);
+        if(!keepAwakeDesired) releaseWakeLock();
+      }
+      function reset(){ pause(); idx=0; timeLeft=plan[0].dur; updateUI(); }
+      function skip(){ timeLeft=0.01; }
+      function back(){ if(idx>0){ idx--; timeLeft=plan[idx].dur; updateUI(); } }
+
+      function enterFS(){
+        const el = document.documentElement; if(el.requestFullscreen) el.requestFullscreen();
+      }
+
+      function applyFromInputs(){
+        const cfg = {
+          work: +els.workSec.value || DEFAULTS.work,
+          rest: +els.restSec.value || DEFAULTS.rest,
+          setRest: +els.setRestSec.value || DEFAULTS.setRest,
+          rounds: Math.max(1, Math.min(10, +els.rounds.value || DEFAULTS.rounds))
+        };
+        saveSettings(cfg);
+        init(cfg);
+      }
+
+      function fillInputs(cfg){
+        els.workSec.value = cfg.work;
+        els.restSec.value = cfg.rest;
+        els.setRestSec.value = cfg.setRest;
+        els.rounds.value = cfg.rounds;
+      }
+
+      function init(cfg){
+        settings = cfg;
+        plan = buildPlan(settings);
+        totalDur = plan.reduce((a,b)=>a+b.dur, 0);
+        idx = 0; timeLeft = plan[0].dur; running=false; clearInterval(timer);
+        renderList(); updateUI(); toggleButtons();
+      }
+
+      // ===== Keep screen awake (Screen Wake Lock API) =====
+      async function requestWakeLock(){
+        try{
+          if('wakeLock' in navigator){
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', ()=>{});
+            document.addEventListener('visibilitychange', async ()=>{
+              if(document.visibilityState==='visible' && keepAwakeDesired && !wakeLock){
+                try{ wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
+              }
+            });
+          }
+        }catch(e){ /* ignore */ }
+      }
+      function releaseWakeLock(){ try{ if(wakeLock){ wakeLock.release(); } }catch(e){} finally { wakeLock=null; }
+      function toggleAwake(){
+        keepAwakeDesired = !keepAwakeDesired;
+        els.awake.textContent = keepAwakeDesired ? '🌙 Keep Awake: On' : '🌙 Keep Awake: Off';
+        if(keepAwakeDesired){ requestWakeLock(); }
+        else { releaseWakeLock(); }
+      }
+
+      // ===== bootstrap =====
+      let bootstrapError=null;
+      try{
+        const loaded = loadSettings();
+        fillInputs(loaded);
+        init(loaded);
+
+        // events
+        els.start.onclick = start;
+        els.pause.onclick = pause;
+        els.reset.onclick = reset;
+        els.skip.onclick = skip;
+        els.back.onclick = back;
+        els.fs.onclick = enterFS;
+        els.apply.onclick = applyFromInputs;
+        els.awake.onclick = toggleAwake;
+
+        window.addEventListener('keydown', (e)=>{
+          const tag = document.activeElement && document.activeElement.tagName;
+          if(tag==='INPUT' || tag==='SELECT' || tag==='TEXTAREA') return;
+          if(e.code==='Space'){ e.preventDefault(); (running?pause:start)(); }
+          if(e.key==='n'){ skip(); }
+          if(e.key==='b'){ back(); }
+        });
+      }catch(e){ bootstrapError=e; throw e; }
+
+    }catch(e){
+      console.error(e);
+      var n=document.getElementById('notice'); if(n){ n.textContent='Preview error: '+ (e && e.message ? e.message : e); n.classList.add('show'); }
     }
-
-    function fillInputs(cfg){
-      els.workSec.value = cfg.work;
-      els.restSec.value = cfg.rest;
-      els.setRestSec.value = cfg.setRest;
-      els.rounds.value = cfg.rounds;
-    }
-
-    function init(cfg){
-      settings = cfg;
-      plan = buildPlan(settings);
-      totalDur = plan.reduce((a,b)=>a+b.dur, 0);
-      idx = 0; timeLeft = plan[0].dur; running=false; clearInterval(timer);
-      renderList(); updateUI(); toggleButtons();
-    }
-
-    // ===== bootstrap =====
-    let settings = loadSettings();
-    fillInputs(settings);
-    init(settings);
-
-    // events
-    els.start.onclick = start;
-    els.pause.onclick = pause;
-    els.reset.onclick = reset;
-    els.skip.onclick = skip;
-    els.back.onclick = back;
-    els.fs.onclick = enterFS;
-    els.apply.onclick = applyFromInputs;
-
-    // Keyboard controls: space=start/pause, n=next, b=back
-    window.addEventListener('keydown', (e)=>{
-      if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) return;
-      if(e.code==='Space'){ e.preventDefault(); (running?pause:start)(); }
-      if(e.key==='n'){ skip(); }
-      if(e.key==='b'){ back(); }
-    });
+  })();
   </script>
 </body>
 </html>
