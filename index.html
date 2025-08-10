@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jump Rope + Push-up Interval Timer</title>
+
+<!-- PWA: iOS and general -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f1115">
+
+<style>
+  :root{
+    --bg:#0f1115; --card:#161a22; --ink:#e8ecf1; --muted:#98a2b3;
+    --brand:#7c9cff; --accent:#23d18b; --danger:#ff6b6b; --ring:#2b3040;
+    --btn:#232a36; --btn-hover:#2b3445;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,Arial;
+    background:linear-gradient(180deg,#0c0e13, #0f1115 40%);
+    color:var(--ink);
+    min-height:100svh; display:grid; place-items:start center;
+    padding:16px;
+  }
+  .app{width:min(900px,100%); display:grid; gap:16px}
+  header{display:flex; align-items:center; justify-content:space-between}
+  h1{font-size:20px; margin:0; letter-spacing:.3px}
+  .badge{font-size:12px; color:var(--muted); background:#1d2330; padding:4px 8px; border-radius:8px}
+  .grid{display:grid; grid-template-columns: 1.2fr .8fr; gap:16px}
+  @media (max-width:800px){ .grid{grid-template-columns:1fr} }
+
+  .card{background:var(--card); border:1px solid #1e2432; border-radius:14px; padding:14px}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .row > *{flex:1}
+  .controls .row > *{flex:initial}
+  label{font-size:12px; color:var(--muted); display:block; margin-bottom:6px}
+  input[type="number"], input[type="text"], select{
+    width:100%; padding:10px 12px; border-radius:10px; border:1px solid #283042;
+    background:#111622; color:var(--ink); outline:none;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance: none; margin:0 }
+  button{
+    background:var(--btn); border:1px solid #2c3446; color:var(--ink);
+    padding:10px 14px; border-radius:12px; cursor:pointer; transition:.15s ease;
+  }
+  button:hover{background:var(--btn-hover)}
+  .primary{background:var(--brand); border-color:#6a88ff; color:#0c0f17}
+  .success{background:var(--accent); border-color:#1fbb7c; color:#08130f}
+  .danger{background:var(--danger); border-color:#ff8484; color:#2b0b0b}
+  .ghost{background:transparent; border-color:#2c3446}
+  .chip{padding:6px 10px; background:#1b2230; border:1px solid #2b3446; border-radius:999px; font-size:12px}
+  .tiny{font-size:12px}
+
+  .phase{display:grid; grid-template-columns: 1.2fr repeat(3, .6fr) .4fr; gap:10px; align-items:end}
+  @media (max-width:640px){ .phase{grid-template-columns: 1fr 1fr 1fr 1fr auto} }
+
+  .phase + .phase{margin-top:10px}
+  .phase h3{margin:0 0 6px 0; font-size:14px}
+
+  .timer{
+    display:grid; grid-template-columns: 300px 1fr; gap:16px; align-items:center;
+  }
+  @media (max-width:800px){ .timer{grid-template-columns:1fr} }
+
+  .dial{
+    width:min(70vw,300px); aspect-ratio:1; position:relative; place-self:center;
+  }
+  canvas{width:100%; height:100%}
+  .dial .readout{
+    position:absolute; inset:0; display:grid; place-items:center; text-align:center;
+  }
+  .big{font-size:44px; font-weight:700; line-height:1}
+  .sub{font-size:13px; color:var(--muted); margin-top:6px}
+
+  .stack{display:grid; gap:10px}
+  .list{display:grid; gap:8px; max-height:220px; overflow:auto; padding-right:4px}
+  .item{display:flex; justify-content:space-between; align-items:center; background:#121827; border:1px solid #252f44; padding:8px 10px; border-radius:10px}
+  .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#202638; border:1px solid #2a3450; padding:2px 6px; border-radius:6px; font-size:12px}
+
+  .footer{display:flex; justify-content:space-between; align-items:center; color:var(--muted)}
+  a{color:#b4c6ff; text-decoration:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Interval Timer — Jump Rope + Push-ups</h1>
+    <span class="badge">PWA</span>
+  </header>
+
+  <div class="grid">
+    <section class="card stack">
+      <div class="timer">
+        <div class="dial">
+          <canvas id="ring" width="600" height="600" aria-hidden="true"></canvas>
+          <div class="readout">
+            <div class="sub" id="segmentLabel">Ready</div>
+            <div class="big" id="timeLeft">00:00</div>
+            <div class="sub" id="phaseInfo">Phase — Round — Segment</div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="row controls">
+            <button class="primary" id="startPause">Start</button>
+            <button class="ghost" id="next">Next ⏭</button>
+            <button class="ghost" id="prev">⏮ Prev</button>
+            <button class="danger" id="reset">Reset</button>
+          </div>
+          <div class="row">
+            <label class="chip"><input type="checkbox" id="sound" checked> Beep</label>
+            <label class="chip"><input type="checkbox" id="vibrate" checked> Vibrate</label>
+            <label class="chip"><input type="checkbox" id="countdown3" checked> 3-2-1 cue</label>
+            <label class="chip"><input type="checkbox" id="noEndRest"> Skip final rest</label>
+            <label class="chip"><input type="checkbox" id="dark" checked> Dark mode</label>
+          </div>
+
+          <div class="card" style="background:#121826;border-color:#223049">
+            <div class="row tiny" style="justify-content:space-between">
+              <div>Keyboard: <span class="kbd">Space</span> Start/Pause • <span class="kbd">N</span> Next • <span class="kbd">P</span> Prev • <span class="kbd">R</span> Reset</div>
+              <div id="status" class="tiny">Ready</div>
+            </div>
+          </div>
+
+          <div class="card" style="background:#121826;border-color:#223049">
+            <div class="row">
+              <button id="savePreset">Save as Default</button>
+              <button id="exportJSON">Export Routine</button>
+              <input id="importFile" type="file" accept="application/json" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card stack">
+      <div class="row">
+        <select id="presets">
+          <option value="">Presets for Your Plan…</option>
+          <option value="w1">Week 1 — 30s / 30s × 8 + Push-ups 3×</option>
+          <option value="w2">Week 2 — 40s / 20s × 10 + Push-ups 4×</option>
+          <option value="w3">Week 3 — 45s / 15s × 12 + Push-ups 5×</option>
+          <option value="w4">Week 4 — 60s / 15s × 12–15 + Push-ups 6×</option>
+        </select>
+        <button id="applyPreset">Apply</button>
+      </div>
+
+      <div class="stack">
+        <h2 style="font-size:16px;margin:0">Routine Phases</h2>
+        <div id="phases" class="list"></div>
+        <button id="addPhase">+ Add Phase</button>
+      </div>
+
+      <div class="card" style="background:#121826;border-color:#223049">
+        <h3 style="margin:0 0 8px 0;font-size:14px;">How to use</h3>
+        <ul class="tiny" style="margin:0 0 0 18px; color:var(--muted); line-height:1.6">
+          <li>Install to Home Screen for full-screen use and offline support.</li>
+          <li>Pick a preset (Week 1–4) or build your own phases.</li>
+          <li>Press <strong>Start</strong>. Use <strong>Next</strong> to skip ahead (e.g., jump rope → push-ups).</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <div class="footer">
+    <div>Made for fast jump rope intervals + push-up sets.</div>
+    <div><a href="#" id="share">Share current routine</a></div>
+  </div>
+</div>
+
+<script>
+/* Register service worker for offline + A2HS */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  });
+}
+
+/* ---------- Utilities ---------- */
+const $ = sel => document.querySelector(sel);
+const ring = $('#ring');
+const ctx = ring.getContext('2d');
+const TAU = Math.PI * 2;
+
+const fmt = (s)=> {
+  s = Math.max(0, Math.round(s));
+  const m = Math.floor(s/60).toString().padStart(2,'0');
+  const x = (s%60).toString().padStart(2,'0');
+  return `${m}:${x}`;
+};
+
+function beep(type="short"){
+  if(!$('#sound').checked) return;
+  const ctxA = new (window.AudioContext || window.webkitAudioContext)();
+  const o = ctxA.createOscillator();
+  const g = ctxA.createGain();
+  o.connect(g); g.connect(ctxA.destination);
+  if(type==="short"){ o.frequency.value=880; }
+  else if(type==="long"){ o.frequency.value=560; }
+  else if(type==="tick"){ o.frequency.value=1200; }
+  o.type="sine"; g.gain.value=0.001;
+  o.start();
+  const now = ctxA.currentTime;
+  g.gain.exponentialRampToValueAtTime(0.15, now+0.01);
+  g.gain.exponentialRampToValueAtTime(0.00001, now + (type==="long"?0.25:0.08));
+  o.stop(now + (type==="long"?0.28:0.1));
+}
+
+function vibrate(ms=60){
+  if(!$('#vibrate').checked) return;
+  if(navigator.vibrate) navigator.vibrate(ms);
+}
+
+/* ---------- Routine Model ---------- */
+function defaultPhases(){
+  return [
+    { name:"Jump Rope", work:30, rest:30, rounds:8, color:"#7c9cff" },
+    { name:"Push-ups", work:45, rest:30, rounds:3, color:"#23d18b" }
+  ];
+}
+
+let phases = JSON.parse(localStorage.getItem("jr_phases") || "null") || defaultPhases();
+
+/* ---------- Builder UI ---------- */
+const phasesEl = $('#phases');
+
+function phaseRow(p, idx){
+  const row = document.createElement('div');
+  row.className = 'phase';
+  row.innerHTML = `
+    <div>
+      <label>Name</label>
+      <input type="text" value="\${p.name}" data-k="name" />
+    </div>
+    <div>
+      <label>Work (sec)</label>
+      <input type="number" min="1" value="\${p.work}" data-k="work" />
+    </div>
+    <div>
+      <label>Rest (sec)</label>
+      <input type="number" min="0" value="\${p.rest}" data-k="rest" />
+    </div>
+    <div>
+      <label>Rounds</label>
+      <input type="number" min="1" value="\${p.rounds}" data-k="rounds" />
+    </div>
+    <div class="row" style="gap:6px">
+      <button title="Move up">↑</button>
+      <button title="Move down">↓</button>
+      <button class="danger" title="Delete">✕</button>
+    </div>
+  `;
+  row.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const k = inp.dataset.k;
+      let v = inp.type==="number" ? parseInt(inp.value||0,10) : inp.value;
+      if(k==="work"||k==="rest") v = Math.max(0, v|0);
+      if(k==="rounds") v = Math.max(1, v|0);
+      phases[idx][k] = v;
+      persist();
+      refresh();
+    });
+  });
+  const [up,down,del] = row.querySelectorAll('button');
+  up.onclick = ()=>{ if(idx>0){ const tmp = phases[idx-1]; phases[idx-1]=phases[idx]; phases[idx]=tmp; persist(); renderPhases(); } };
+  down.onclick = ()=>{ if(idx<phases.length-1){ const tmp = phases[idx+1]; phases[idx+1]=phases[idx]; phases[idx]=tmp; persist(); renderPhases(); } };
+  del.onclick = ()=>{ phases.splice(idx,1); persist(); renderPhases(); };
+  return row;
+}
+
+function renderPhases(){
+  phasesEl.innerHTML = '';
+  phases.forEach((p,i)=> phasesEl.appendChild(phaseRow(p,i)));
+}
+
+function persist(){ localStorage.setItem("jr_phases", JSON.stringify(phases)); }
+
+/* ---------- Presets ---------- */
+function applyPreset(key){
+  const sets = {
+    w1: [
+      {name:"Jump Rope", work:30, rest:30, rounds:8, color:"#7c9cff"},
+      {name:"Push-ups", work:45, rest:30, rounds:3, color:"#23d18b"}
+    ],
+    w2: [
+      {name:"Jump Rope", work:40, rest:20, rounds:10, color:"#7c9cff"},
+      {name:"Push-ups", work:50, rest:25, rounds:4, color:"#23d18b"}
+    ],
+    w3: [
+      {name:"Jump Rope", work:45, rest:15, rounds:12, color:"#7c9cff"},
+      {name:"Push-ups", work:55, rest:25, rounds:5, color:"#23d18b"}
+    ],
+    w4: [
+      {name:"Jump Rope", work:60, rest:15, rounds:12, color:"#7c9cff"},
+      {name:"Push-ups", work:60, rest:20, rounds:6, color:"#23d18b"}
+    ],
+  };
+  if(sets[key]){ phases = sets[key]; persist(); renderPhases(); resetTimer(); }
+}
+
+/* ---------- Timer Engine ---------- */
+let running = false;
+let segStart = 0;
+let timeLeft = 0;
+let rafId = null;
+
+// navigation pointers
+let pIdx = 0;      // phase index
+let round = 1;     // 1..rounds
+let segment = "work"; // "work" or "rest"
+
+function currentPhase(){ return phases[pIdx]; }
+
+function nextStep(){
+  const p = currentPhase();
+  if(!p) return false;
+
+  if(segment === "work"){
+    if(round < p.rounds){
+      if(p.rest>0) { segment = "rest"; setCountdown(p.rest); cue("rest"); return true; }
+      round++; segment = "work"; setCountdown(p.work); cue("work"); return true;
+    } else {
+      return nextPhase();
+    }
+  }
+  if(segment === "rest"){
+    round++; segment = "work"; setCountdown(p.work); cue("work"); return true;
+  }
+  return false;
+}
+
+function prevStep(){
+  if(segment === "work" && (round>1 || pIdx>0)){
+    if(round>1){ round--; segment="rest"; const p=currentPhase(); if(p.rest>0){ setCountdown(p.rest); } else { segment="work"; setCountdown(p.work);} }
+    else {
+      pIdx = Math.max(0, pIdx-1);
+      const p=currentPhase();
+      round = p.rounds;
+      if(p.rest>0){ segment="rest"; setCountdown(p.rest); }
+      else { segment="work"; setCountdown(p.work); }
+    }
+  } else if(segment==="rest"){
+    segment="work"; const p=currentPhase(); setCountdown(p.work);
+  }
+  updateUI();
+}
+
+function nextPhase(){
+  if(pIdx < phases.length-1){
+    pIdx++; round=1; segment="work"; const p=currentPhase(); setCountdown(p.work); cue("phase"); return true;
+  } else {
+    finishAll();
+    return false;
+  }
+}
+
+function setCountdown(sec){
+  timeLeft = sec;
+  segStart = performance.now();
+}
+
+function start(){
+  if(running) return;
+  if(!phases.length){ alert("Add at least one phase."); return; }
+  if(segment==="done"){ resetTimer(); }
+  running = true; $('#startPause').textContent = "Pause";
+  if(segStart===0){
+    pIdx = 0; round = 1; segment = "work"; setCountdown(currentPhase().work); cue("start");
+  }
+  tick();
+}
+
+function pause(){ running = false; $('#startPause').textContent = "Start"; cancelAnimationFrame(rafId); }
+
+function resetTimer(){
+  running = false; cancelAnimationFrame(rafId);
+  pIdx=0; round=1; segment="work"; segStart=0; timeLeft=0;
+  $('#startPause').textContent = "Start";
+  $('#status').textContent = "Ready";
+  drawRing(0, "#3a4258");
+  $('#timeLeft').textContent = "00:00";
+  $('#segmentLabel').textContent = "Ready";
+  updatePhaseInfo();
+}
+
+function finishAll(){
+  running = false; cancelAnimationFrame(rafId);
+  $('#status').textContent = "Done! 🎉";
+  $('#segmentLabel').textContent = "Complete";
+  $('#timeLeft').textContent = "00:00";
+  drawRing(0, "#3a4258");
+  beep("long"); if(navigator.vibrate) navigator.vibrate(200);
+  $('#startPause').textContent = "Restart";
+  segment = "done";
+}
+
+function cue(type){
+  if(type==="start"){ $('#status').textContent = "Started"; beep("long"); if(navigator.vibrate) navigator.vibrate(80); }
+  if(type==="work"){ $('#status').textContent = "Work"; beep("short"); if(navigator.vibrate) navigator.vibrate(50); }
+  if(type==="rest"){ $('#status').textContent = "Rest"; beep("short"); if(navigator.vibrate) navigator.vibrate(50); }
+  if(type==="phase"){ $('#status').textContent = "Next Phase"; beep("long"); if(navigator.vibrate) navigator.vibrate(80); }
+}
+
+function tick(){
+  if(!running) return;
+  const p = currentPhase();
+  if(!p){ finishAll(); return; }
+
+  const elapsed = (performance.now() - segStart)/1000;
+  const remaining = Math.max(0, Math.ceil(timeLeft - elapsed));
+
+  if($('#countdown3').checked && remaining<=3 && remaining>0){
+    beep("tick");
+  }
+
+  $('#timeLeft').textContent = fmt(remaining);
+  $('#segmentLabel').textContent = segment === "work" ? "WORK" : "REST";
+
+  updatePhaseInfo();
+
+  const segTotal = segment==="work" ? p.work : p.rest;
+  const frac = segTotal>0 ? (segTotal - Math.min(segTotal, elapsed)) / segTotal : 0;
+  drawRing(frac, p.color || "#7c9cff", segment);
+
+  if(remaining<=0){
+    beep("long"); if(navigator.vibrate) navigator.vibrate(80);
+    if(segment==="work"){
+      segment="work"; nextStep();
+    } else {
+      nextStep();
+    }
+    segStart = performance.now();
+  }
+
+  rafId = requestAnimationFrame(tick);
+}
+
+function updatePhaseInfo(){
+  const p = currentPhase();
+  if(!p){ $('#phaseInfo').textContent = ""; return; }
+  $('#phaseInfo').textContent = `${p.name} • Round ${round}/${p.rounds} • ${segment.toUpperCase()}`;
+}
+
+/* ---------- Ring Drawing ---------- */
+const ringCanvas = document.getElementById('ring');
+const ctx2 = ringCanvas.getContext('2d');
+const TAU2 = Math.PI * 2;
+
+function drawRing(frac, color, seg){
+  const W = ringCanvas.width, H = ringCanvas.height;
+  const cx = W/2, cy = H/2, r = W*0.36;
+  ctx2.clearRect(0,0,W,H);
+
+  ctx2.lineCap="round";
+  ctx2.lineWidth = 28;
+  ctx2.strokeStyle = "#1f2636";
+  ctx2.beginPath();
+  ctx2.arc(cx,cy,r,0,TAU2);
+  ctx2.stroke();
+
+  const ang = -Math.PI/2;
+  ctx2.strokeStyle = color || "#7c9cff";
+  ctx2.beginPath();
+  ctx2.arc(cx,cy,r,ang, ang + TAU2 * Math.max(0, Math.min(1, frac)), false);
+  ctx2.stroke();
+
+  ctx2.lineWidth = 8;
+  ctx2.strokeStyle = seg==="work" ? "#2e8cff" : "#21b97a";
+  ctx2.beginPath();
+  ctx2.arc(cx,cy,r-22,0,TAU2);
+  ctx2.stroke();
+}
+
+/* ---------- Sharing / Import / Export ---------- */
+$('#savePreset').onclick = ()=>{ persist(); $('#status').textContent="Saved as default"; };
+$('#exportJSON').onclick = ()=> {
+  const blob = new Blob([JSON.stringify(phases,null,2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'routine.json'; a.click();
+  URL.revokeObjectURL(url);
+};
+$('#importFile').onchange = (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const fr = new FileReader();
+  fr.onload = ()=>{
+    try{
+      const data = JSON.parse(fr.result);
+      if(Array.isArray(data) && data.length){
+        phases = data; persist(); renderPhases(); resetTimer();
+      } else alert("Invalid routine file.");
+    }catch(err){ alert("Invalid JSON."); }
+  };
+  fr.readAsText(file);
+};
+$('#share').onclick = (e)=>{
+  e.preventDefault();
+  const payload = btoa(encodeURIComponent(JSON.stringify(phases)));
+  const url = `${location.origin}${location.pathname}#routine=${payload}`;
+  navigator.clipboard?.writeText(url);
+  alert("Share link copied!");
+};
+
+(function(){
+  const m = location.hash.match(/routine=([^&]+)/);
+  if(m){
+    try{
+      const data = JSON.parse(decodeURIComponent(atob(m[1])));
+      if(Array.isArray(data)&&data.length){ phases=data; persist(); }
+    }catch(e){}
+  }
+  renderPhases();
+  resetTimer();
+})();
+
+/* ---------- Builder Hooks ---------- */
+const phasesEl2 = document.getElementById('phases');
+document.getElementById('applyPreset').onclick = ()=> applyPreset(document.getElementById('presets').value);
+document.getElementById('addPhase').onclick = ()=>{
+  phases.push({name:"New Phase", work:30, rest:30, rounds:8, color:"#7c9cff"});
+  persist(); renderPhases();
+};
+document.getElementById('startPause').onclick = ()=> running ? pause() : start();
+document.getElementById('reset').onclick = ()=> resetTimer();
+document.getElementById('next').onclick = ()=> { if(segment==="done"){ resetTimer(); } else { nextStep(); segStart = performance.now(); updateUI(); } };
+document.getElementById('prev').onclick = ()=> { prevStep(); segStart = performance.now(); updateUI(); };
+
+document.documentElement.style.colorScheme = "dark";
+</script>
+</body>
+</html>
