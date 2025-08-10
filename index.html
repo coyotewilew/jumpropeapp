@@ -29,7 +29,7 @@
   .phase.setrest{background:rgba(245,158,11,.15); color:var(--warn); border:1px solid rgba(245,158,11,.4)}
 
   .controls{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:10px}
-  button{appearance:none; border:none; cursor:pointer; background:#1e293b; color:#fff; padding:14px 18px; border-radius:14px; font-weight:800; letter-spacing:.3px; font-size:16px}
+  button{appearance:none; border:none; cursor:pointer; background:#1e293b; color:var(--text); padding:14px 18px; border-radius:14px; font-weight:800; letter-spacing:.3px; font-size:16px}
   button.primary{background:var(--accent); color:#0b1510}
   button.warn{background:#334155}
   button:disabled{opacity:.5; cursor:not-allowed}
@@ -52,16 +52,13 @@
   details.settings summary{cursor:pointer; font-weight:800}
   .settings-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:12px}
   .settings-grid label{display:grid; gap:6px; font-size:14px; color:var(--muted)}
-  input[type="number"], select{width:100%; padding:12px; border-radius:12px; border:1px solid #1f2937; background:#0b1220; color:#fff}
+  input[type="number"], select{width:100%; padding:12px; border-radius:12px; border:1px solid #1f2937; background:#0b1220; color:var(--text)}
 
   footer{opacity:.7; text-align:center; padding:16px; font-size:13px}
 
   /* Full workout progress bar */
   .full-progress {height:14px; background:#0f172a; border:1px solid #263244; border-radius:999px; overflow:hidden; margin-top:8px}
   .full-progress>div{height:100%; width:0%; background:linear-gradient(90deg, rgba(250,204,21,.85), rgba(245,158,11,.9))}
-
-  /* Test output */
-  #testOutput{white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; background:#0b1220; color:#e5e7eb; border:1px solid #1f2937; border-radius:12px; padding:10px; max-height:220px; overflow:auto}
 </style>
 </head>
 <body>
@@ -106,7 +103,7 @@
         <button id="reset">⟲ Reset</button>
         <button id="skip">Next ▶︎</button>
         <button id="fs">⤢ Fullscreen</button>
-        <button id="runTests">🧪 Run Tests</button>
+        <button id="awake">🌙 Keep Awake: Off</button>
       </div>
 
       <details class="settings" style="margin-top:14px">
@@ -129,11 +126,6 @@
           <button id="apply" class="primary">Apply</button>
         </div>
       </details>
-
-      <details class="settings" style="margin-top:14px">
-        <summary>Test Results</summary>
-        <div id="testOutput">(No tests run yet)</div>
-      </details>
     </section>
 
     <aside class="card">
@@ -151,19 +143,6 @@
 
   <script>
   (function(){
-    // ---- Global error & sandbox quirk handler (e.g., MetaMask noise) ----
-    function showNotice(msg){ var n=document.getElementById('notice'); if(n){ n.textContent=msg; n.classList.add('show'); } }
-    window.addEventListener('error', (e)=>{
-      const msg = (e && e.message) ? e.message : '';
-      if(/metamask|ethereum/i.test(msg)) { console.warn('Ignored sandbox extension error:', msg); return; }
-      showNotice('Error: '+msg);
-    });
-    window.addEventListener('unhandledrejection', (e)=>{
-      const msg = (e && e.reason && e.reason.message) ? e.reason.message : (e && e.reason ? String(e.reason) : '');
-      if(/metamask|ethereum/i.test(msg)) { console.warn('Ignored sandbox extension rejection:', msg); return; }
-      showNotice('Unhandled promise: '+msg);
-    });
-
     try{
       // ===== Config =====
       const DEFAULTS = { work:45, rest:15, setRest:60, rounds:5 };
@@ -201,8 +180,9 @@
       let timer = null;
       let totalDur = 0; // total workout seconds
 
-      // Keep-awake state (automatic while running)
-      let wakeLock = null;
+      // Keep-awake state
+      let wakeLock = null; // Screen Wake Lock handle
+      let keepAwakeDesired = false; // user toggle
 
       const els = {
         setNow: document.getElementById('setNow'),
@@ -232,8 +212,7 @@
         totalElapsed: document.getElementById('totalElapsed'),
         totalRemaining: document.getElementById('totalRemaining'),
         totalTotal: document.getElementById('totalTotal'),
-        testOutput: document.getElementById('testOutput'),
-        runTests: document.getElementById('runTests')
+        awake: document.getElementById('awake')
       };
 
       function playBeep(freq, dur){
@@ -355,7 +334,8 @@
           clearInterval(timer);
           playBeep(660,200); playBeep(440,220);
           toggleButtons();
-          releaseWakeLock();
+          if(!keepAwakeDesired) releaseWakeLock();
+          // No alert in preview to avoid sandbox issues
           console.log('Workout complete!');
         }
       }
@@ -376,12 +356,12 @@
       function start(){
         if(running) return;
         running=true; toggleButtons();
-        requestWakeLock();
+        if(keepAwakeDesired) requestWakeLock();
         timer = setInterval(tick, 200);
       }
       function pause(){
         running=false; toggleButtons(); clearInterval(timer);
-        releaseWakeLock();
+        if(!keepAwakeDesired) releaseWakeLock();
       }
       function reset(){ pause(); idx=0; timeLeft=plan[0].dur; updateUI(); }
       function skip(){ timeLeft=0.01; }
@@ -417,14 +397,14 @@
         renderList(); updateUI(); toggleButtons();
       }
 
-      // ===== Keep screen awake (automatic while running) =====
+      // ===== Keep screen awake (Screen Wake Lock API) =====
       async function requestWakeLock(){
         try{
           if('wakeLock' in navigator){
             wakeLock = await navigator.wakeLock.request('screen');
-            wakeLock.addEventListener('release', ()=>{ wakeLock=null; });
+            wakeLock.addEventListener('release', ()=>{});
             document.addEventListener('visibilitychange', async ()=>{
-              if(document.visibilityState==='visible' && running && !wakeLock){
+              if(document.visibilityState==='visible' && keepAwakeDesired && !wakeLock){
                 try{ wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
               }
             });
@@ -432,88 +412,42 @@
         }catch(e){ /* ignore */ }
       }
       function releaseWakeLock(){ try{ if(wakeLock){ wakeLock.release(); } }catch(e){} finally { wakeLock=null; }
-
-      // ===== Tests =====
-      function assert(condition, message){ if(!condition) throw new Error(message||'Assertion failed'); }
-      function runAllTests(){
-        const out = [];
-        function log(msg){ out.push(msg); }
-        const _alert = window.alert; window.alert = ()=>{}; // avoid sandbox popups
-        const _beep = playBeep; playBeep = ()=>{}; // silence during tests
-
-        // 1) Plan length formula: length = 18*rounds - 1
-        (function(){
-          const cfg = {work:45, rest:15, setRest:60, rounds:5};
-          const p = (function(tmp){ const oldPlan=plan, oldTotal=totalDur; const res=buildPlan(tmp); plan=oldPlan; totalDur=oldTotal; return res; })(cfg);
-          assert(p.length === 18*cfg.rounds - 1, `Expected plan length ${18*cfg.rounds-1}, got ${p.length}`);
-          log('✔ Plan length matches formula');
-        })();
-
-        // 2) Total duration formula: rounds*(9*work+8*rest) + (rounds-1)*setRest
-        (function(){
-          const cfg = {work:40, rest:20, setRest:60, rounds:3};
-          const p = (function(tmp){ const oldPlan=plan, oldTotal=totalDur; const res=buildPlan(tmp); plan=oldPlan; totalDur=oldTotal; return res; })(cfg);
-          const dur = p.reduce((a,b)=>a+b.dur,0);
-          const formula = cfg.rounds*(9*cfg.work + 8*cfg.rest) + (cfg.rounds-1)*cfg.setRest;
-          assert(dur === formula, `Expected total ${formula}s, got ${dur}s`);
-          log('✔ Total duration matches formula');
-        })();
-
-        // 3) stepNext reaches completion cleanly
-        (function(){
-          const cfg = {work:1, rest:1, setRest:1, rounds:1};
-          init(cfg); running=true; toggleButtons();
-          let safety=200; while(idx < plan.length-1 && safety--) { timeLeft=0; stepNext(); }
-          timeLeft=0; stepNext();
-          assert(running===false, 'Expected running=false after completion');
-          log('✔ stepNext completes and stops timer');
-        })();
-
-        // 4) tick crosses zero advances index
-        (function(){
-          const cfg = {work:2, rest:1, setRest:1, rounds:1};
-          init(cfg); running=true; toggleButtons();
-          const startIdx = idx; timeLeft = 0.1; tick();
-          assert(idx===startIdx+1, 'Expected idx to advance after tick crossing zero');
-          log('✔ tick triggers step advance');
-        })();
-
-        // 5) No MetaMask/ethereum calls are made
-        (function(){
-          assert(typeof window.ethereum === 'undefined' || true, 'App should not require MetaMask');
-          log('✔ No dependency on MetaMask');
-        })();
-
-        window.alert = _alert; playBeep = _beep;
-        els.testOutput.textContent = out.join('\n');
+      function toggleAwake(){
+        keepAwakeDesired = !keepAwakeDesired;
+        els.awake.textContent = keepAwakeDesired ? '🌙 Keep Awake: On' : '🌙 Keep Awake: Off';
+        if(keepAwakeDesired){ requestWakeLock(); }
+        else { releaseWakeLock(); }
       }
 
       // ===== bootstrap =====
-      const loaded = loadSettings();
-      fillInputs(loaded);
-      init(loaded);
+      let bootstrapError=null;
+      try{
+        const loaded = loadSettings();
+        fillInputs(loaded);
+        init(loaded);
 
-      // events
-      els.start.onclick = start;
-      els.pause.onclick = pause;
-      els.reset.onclick = reset;
-      els.skip.onclick = skip;
-      els.back.onclick = back;
-      els.fs.onclick = enterFS;
-      els.apply.onclick = applyFromInputs;
-      els.runTests.onclick = runAllTests;
+        // events
+        els.start.onclick = start;
+        els.pause.onclick = pause;
+        els.reset.onclick = reset;
+        els.skip.onclick = skip;
+        els.back.onclick = back;
+        els.fs.onclick = enterFS;
+        els.apply.onclick = applyFromInputs;
+        els.awake.onclick = toggleAwake;
 
-      window.addEventListener('keydown', (e)=>{
-        const tag = document.activeElement && document.activeElement.tagName;
-        if(tag==='INPUT' || tag==='SELECT' || tag==='TEXTAREA') return;
-        if(e.code==='Space'){ e.preventDefault(); (running?pause:start)(); }
-        if(e.key==='n'){ skip(); }
-        if(e.key==='b'){ back(); }
-      });
+        window.addEventListener('keydown', (e)=>{
+          const tag = document.activeElement && document.activeElement.tagName;
+          if(tag==='INPUT' || tag==='SELECT' || tag==='TEXTAREA') return;
+          if(e.code==='Space'){ e.preventDefault(); (running?pause:start)(); }
+          if(e.key==='n'){ skip(); }
+          if(e.key==='b'){ back(); }
+        });
+      }catch(e){ bootstrapError=e; throw e; }
 
     }catch(e){
       console.error(e);
-      showNotice('Preview error: '+ (e && e.message ? e.message : e));
+      var n=document.getElementById('notice'); if(n){ n.textContent='Preview error: '+ (e && e.message ? e.message : e); n.classList.add('show'); }
     }
   })();
   </script>
