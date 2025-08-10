@@ -4,12 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Jump Rope HIIT Timer</title>
+  <meta name="theme-color" content="#16a34a">
+  <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='24' fill='%231f2937'/%3E%3Ccircle cx='64' cy='64' r='34' fill='%236ee7b7'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    html, body { height: 100%; }
+    html, body { height: 100%; background:#0f172a; }
     body { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
     * { -webkit-tap-highlight-color: transparent; }
   </style>
@@ -17,9 +21,10 @@
 <body>
   <div id="root"></div>
   <!-- React & Babel -->
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
   <script type="text/babel">
     const {useEffect, useMemo, useRef, useState} = React;
 
@@ -273,5 +278,47 @@
                       <div className="flex items-center gap-2">
                         <span className={`inline-block w-2 h-2 rounded-full ${it.phase === "work" ? "bg-green-400" : it.phase === "rest" ? "bg-yellow-400" : "bg-blue-400"}`} />
                         <div className="font-semibold">{it.label}</div>
-                      </div>\n                      <div className="text-sm tabular-nums text-slate-300">R{it.round} • {secondsToHMS(it.duration)}</div>
-                    </div>\n                  );\n                })}\n              </div>\n            </div>\n\n            <footer className="mt-8 text-center text-xs text-slate-400">\n              Tip: Add this page to your phone's Home Screen for a full-screen timer experience.\n            </footer>\n          </div>\n        </div>\n      );\n    }\n\n    function NumField({ label, value, onChange }) {\n      return (\n        <label className="grid gap-1">\n          <span className="text-xs uppercase tracking-widest text-slate-400">{label}</span>\n          <input\n            type="number"\n            className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 font-bold"\n            value={value}\n            min={0}\n            onChange={(e) => onChange(parseInt(e.target.value, 10))}\n          />\n        </label>\n      );\n    }\n\n    const root = ReactDOM.createRoot(document.getElementById('root'));\n    root.render(<App />);\n  </script>\n</body>\n</html>\n
+                      </div>
+                      <div className="text-sm tabular-nums text-slate-300">R{it.round} • {secondsToHMS(it.duration)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <footer className="mt-8 text-center text-xs text-slate-400">
+              Tip: Add this page to your phone's Home Screen for a full-screen timer experience.
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    function NumField({ label, value, onChange }) {
+      return (
+        <label className="grid gap-1">
+          <span className="text-xs uppercase tracking-widest text-slate-400">{label}</span>
+          <input
+            type="number"
+            className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 font-bold"
+            value={value}
+            min={0}
+            onChange={(e) => onChange(parseInt(e.target.value, 10))}
+          />
+        </label>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
